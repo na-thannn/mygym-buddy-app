@@ -9,6 +9,8 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { AuthProvider } from "@/lib/auth";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -72,11 +74,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "HL Fitness — Cộng đồng tập luyện tại 303 Lê Thanh Nghị, Đà Nẵng" },
+      { name: "description", content: "Nền tảng theo dõi tiến độ, InBody, và huấn luyện AI dành cho thành viên HL Fitness 303 Lê Thanh Nghị." },
+      { name: "author", content: "HL Fitness" },
+      { property: "og:title", content: "HL Fitness — 303 Lê Thanh Nghị" },
+      { property: "og:description", content: "Theo dõi InBody, ghi nhật ký tập luyện & dinh dưỡng, kết nối cùng HLV." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -113,7 +115,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AuthProvider>
+        <Outlet />
+        <Toaster richColors position="top-center" />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
