@@ -16,6 +16,7 @@ import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedInbodyRouteImport } from './routes/_authenticated/inbody'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedLogWorkoutRouteImport } from './routes/_authenticated/log.workout'
+import { Route as AuthenticatedLogNutritionRouteImport } from './routes/_authenticated/log.nutrition'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -51,6 +52,12 @@ const AuthenticatedLogWorkoutRoute = AuthenticatedLogWorkoutRouteImport.update({
   path: '/log/workout',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedLogNutritionRoute =
+  AuthenticatedLogNutritionRouteImport.update({
+    id: '/log/nutrition',
+    path: '/log/nutrition',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/feed': typeof AuthenticatedFeedRoute
   '/inbody': typeof AuthenticatedInbodyRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
 export interface FileRoutesByTo {
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
   '/feed': typeof AuthenticatedFeedRoute
   '/inbody': typeof AuthenticatedInbodyRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
 export interface FileRoutesById {
@@ -76,13 +85,28 @@ export interface FileRoutesById {
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/inbody': typeof AuthenticatedInbodyRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/_authenticated/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/feed' | '/inbody' | '/profile' | '/log/workout'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/feed'
+    | '/inbody'
+    | '/profile'
+    | '/log/nutrition'
+    | '/log/workout'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/feed' | '/inbody' | '/profile' | '/log/workout'
+  to:
+    | '/'
+    | '/auth'
+    | '/feed'
+    | '/inbody'
+    | '/profile'
+    | '/log/nutrition'
+    | '/log/workout'
   id:
     | '__root__'
     | '/'
@@ -91,6 +115,7 @@ export interface FileRouteTypes {
     | '/_authenticated/feed'
     | '/_authenticated/inbody'
     | '/_authenticated/profile'
+    | '/_authenticated/log/nutrition'
     | '/_authenticated/log/workout'
   fileRoutesById: FileRoutesById
 }
@@ -151,6 +176,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLogWorkoutRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/log/nutrition': {
+      id: '/_authenticated/log/nutrition'
+      path: '/log/nutrition'
+      fullPath: '/log/nutrition'
+      preLoaderRoute: typeof AuthenticatedLogNutritionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -158,6 +190,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedInbodyRoute: typeof AuthenticatedInbodyRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedLogNutritionRoute: typeof AuthenticatedLogNutritionRoute
   AuthenticatedLogWorkoutRoute: typeof AuthenticatedLogWorkoutRoute
 }
 
@@ -165,6 +198,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedInbodyRoute: AuthenticatedInbodyRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedLogNutritionRoute: AuthenticatedLogNutritionRoute,
   AuthenticatedLogWorkoutRoute: AuthenticatedLogWorkoutRoute,
 }
 
