@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Pencil, Trash2, X } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/log/workout")({
   head: () => ({ meta: [{ title: "Nhật ký tập — HL Fitness" }] }),
