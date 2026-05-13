@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Pencil, Trash2, X } from "lucide-react";
+import { Download, FileText, Pencil, Trash2, X } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -77,9 +77,71 @@ function WorkoutLog() {
     else { toast.success("Đã xoá"); if (editingId === id) cancelEdit(); load(); }
   };
 
+  const exportCSV = () => {
+    if (rows.length === 0) { toast.error("Chưa có dữ liệu"); return; }
+    const header = ["Ngày giờ", "Bài tập", "Sets", "Reps", "Tạ (kg)", "Ghi chú"];
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [header.join(",")].concat(
+      rows.map((r) => [formatDateTime(r.performed_at), r.exercise, r.sets ?? "", r.reps ?? "", r.weight_kg ?? "", r.notes ?? ""].map(esc).join(",")),
+    );
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `workout-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Đã xuất CSV");
+  };
+
+  const exportPDF = () => {
+    if (rows.length === 0) { toast.error("Chưa có dữ liệu"); return; }
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Trình duyệt chặn cửa sổ in"); return; }
+    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+    const rowsHtml = rows.map((r) => `
+      <tr>
+        <td>${esc(formatDateTime(r.performed_at))}</td>
+        <td>${esc(r.exercise)}</td>
+        <td style="text-align:center">${r.sets ?? ""}</td>
+        <td style="text-align:center">${r.reps ?? ""}</td>
+        <td style="text-align:center">${r.weight_kg ?? ""}</td>
+        <td>${esc(r.notes ?? "")}</td>
+      </tr>`).join("");
+    w.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Lịch sử tập luyện</title>
+      <style>
+        body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111;padding:24px}
+        h1{font-size:18px;margin:0 0 4px}
+        .sub{color:#666;font-size:12px;margin-bottom:16px}
+        table{width:100%;border-collapse:collapse;font-size:12px}
+        th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
+        th{background:#f5f5f5}
+        @media print{ button{display:none} }
+      </style></head><body>
+      <h1>HL Fitness — Lịch sử tập luyện</h1>
+      <div class="sub">${esc(user?.email ?? "")} • Xuất ngày ${esc(new Date().toLocaleString("vi-VN"))} • ${rows.length} bài tập</div>
+      <table><thead><tr><th>Ngày giờ</th><th>Bài tập</th><th>Sets</th><th>Reps</th><th>Tạ (kg)</th><th>Ghi chú</th></tr></thead>
+      <tbody>${rowsHtml}</tbody></table>
+      <button onclick="window.print()" style="margin-top:16px;padding:8px 16px">In / Lưu PDF</button>
+      <script>setTimeout(()=>window.print(),300)</script>
+      </body></html>`);
+    w.document.close();
+  };
+
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6">
       <PageHeader title="Nhật ký tập luyện" subtitle="Ghi lại bài tập của bạn" />
+      <div className="flex gap-2 mb-4">
+        <Button type="button" variant="outline" size="sm" onClick={exportCSV}>
+          <Download className="size-4 mr-1.5" /> Xuất CSV
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={exportPDF}>
+          <FileText className="size-4 mr-1.5" /> Xuất PDF
+        </Button>
+      </div>
       <form onSubmit={submit} className="rounded-xl border border-border bg-card p-4 mb-6 space-y-3">
         <div className="space-y-1"><Label>Bài tập</Label>
           <Input value={f.exercise} onChange={(e) => setF({ ...f, exercise: e.target.value })} placeholder="VD: Bench Press" required maxLength={100} /></div>
