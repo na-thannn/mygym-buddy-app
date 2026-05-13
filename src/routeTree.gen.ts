@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedInbodyRouteImport } from './routes/_authenticated/inbody'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedLogWorkoutRouteImport } from './routes/_authenticated/log.workout'
 
@@ -35,6 +36,11 @@ const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedInbodyRoute = AuthenticatedInbodyRouteImport.update({
+  id: '/inbody',
+  path: '/inbody',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
   id: '/feed',
   path: '/feed',
@@ -50,6 +56,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/feed': typeof AuthenticatedFeedRoute
+  '/inbody': typeof AuthenticatedInbodyRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
@@ -57,6 +64,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/feed': typeof AuthenticatedFeedRoute
+  '/inbody': typeof AuthenticatedInbodyRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
@@ -66,20 +74,22 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
+  '/_authenticated/inbody': typeof AuthenticatedInbodyRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/feed' | '/profile' | '/log/workout'
+  fullPaths: '/' | '/auth' | '/feed' | '/inbody' | '/profile' | '/log/workout'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/feed' | '/profile' | '/log/workout'
+  to: '/' | '/auth' | '/feed' | '/inbody' | '/profile' | '/log/workout'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/feed'
+    | '/_authenticated/inbody'
     | '/_authenticated/profile'
     | '/_authenticated/log/workout'
   fileRoutesById: FileRoutesById
@@ -120,6 +130,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/inbody': {
+      id: '/_authenticated/inbody'
+      path: '/inbody'
+      fullPath: '/inbody'
+      preLoaderRoute: typeof AuthenticatedInbodyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/feed': {
       id: '/_authenticated/feed'
       path: '/feed'
@@ -139,12 +156,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
+  AuthenticatedInbodyRoute: typeof AuthenticatedInbodyRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedLogWorkoutRoute: typeof AuthenticatedLogWorkoutRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
+  AuthenticatedInbodyRoute: AuthenticatedInbodyRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedLogWorkoutRoute: AuthenticatedLogWorkoutRoute,
 }
@@ -161,3 +180,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
