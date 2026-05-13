@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedPtRouteImport } from './routes/_authenticated/pt'
 import { Route as AuthenticatedProgressRouteImport } from './routes/_authenticated/progress'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedInbodyRouteImport } from './routes/_authenticated/inbody'
@@ -33,6 +34,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedPtRoute = AuthenticatedPtRouteImport.update({
+  id: '/pt',
+  path: '/pt',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProgressRoute = AuthenticatedProgressRouteImport.update({
   id: '/progress',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/inbody': typeof AuthenticatedInbodyRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress': typeof AuthenticatedProgressRoute
+  '/pt': typeof AuthenticatedPtRoute
   '/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/inbody': typeof AuthenticatedInbodyRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress': typeof AuthenticatedProgressRoute
+  '/pt': typeof AuthenticatedPtRoute
   '/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/_authenticated/inbody': typeof AuthenticatedInbodyRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/progress': typeof AuthenticatedProgressRoute
+  '/_authenticated/pt': typeof AuthenticatedPtRoute
   '/_authenticated/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/_authenticated/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/inbody'
     | '/profile'
     | '/progress'
+    | '/pt'
     | '/log/nutrition'
     | '/log/workout'
   fileRoutesByTo: FileRoutesByTo
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/inbody'
     | '/profile'
     | '/progress'
+    | '/pt'
     | '/log/nutrition'
     | '/log/workout'
   id:
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/_authenticated/inbody'
     | '/_authenticated/profile'
     | '/_authenticated/progress'
+    | '/_authenticated/pt'
     | '/_authenticated/log/nutrition'
     | '/_authenticated/log/workout'
   fileRoutesById: FileRoutesById
@@ -171,6 +183,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/pt': {
+      id: '/_authenticated/pt'
+      path: '/pt'
+      fullPath: '/pt'
+      preLoaderRoute: typeof AuthenticatedPtRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/progress': {
       id: '/_authenticated/progress'
@@ -230,6 +249,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedInbodyRoute: typeof AuthenticatedInbodyRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedProgressRoute: typeof AuthenticatedProgressRoute
+  AuthenticatedPtRoute: typeof AuthenticatedPtRoute
   AuthenticatedLogNutritionRoute: typeof AuthenticatedLogNutritionRoute
   AuthenticatedLogWorkoutRoute: typeof AuthenticatedLogWorkoutRoute
 }
@@ -240,6 +260,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedInbodyRoute: AuthenticatedInbodyRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedProgressRoute: AuthenticatedProgressRoute,
+  AuthenticatedPtRoute: AuthenticatedPtRoute,
   AuthenticatedLogNutritionRoute: AuthenticatedLogNutritionRoute,
   AuthenticatedLogWorkoutRoute: AuthenticatedLogWorkoutRoute,
 }
