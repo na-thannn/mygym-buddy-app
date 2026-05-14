@@ -111,3 +111,95 @@ ${JSON.stringify(userCtx, null, 2)}`;
 
     return { ok: true, content };
   });
+
+const planInput = z.object({
+  goal: z.string().min(1).max(500),
+  daysPerWeek: z.number().int().min(1).max(7),
+  notes: z.string().max(500).optional(),
+});
+
+export const generateWorkoutPlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => planInput.parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const [{ data: profile }, { data: ib }] = await Promise.all([
+      supabase.from("profiles").select("display_name, gender, dob, height_cm, target_weight_kg, goal").eq("id", userId).maybeSingle(),
+      supabase.from("inbody_entries").select("weight_kg, body_fat_pct, skeletal_muscle_kg").eq("user_id", userId).order("measured_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("AI chưa được cấu hình.");
+
+    const sys = `Bạn là HLV cá nhân tại HL Fitness. Tạo kế hoạch tập theo tuần bằng tiếng Việt cho thành viên. Trả về JSON THEO ĐÚNG SCHEMA, không thêm văn bản khác.
+Thông tin thành viên: ${JSON.stringify({ profile, latestInbody: ib })}
+Mục tiêu: ${data.goal}
+Số buổi/tuần: ${data.daysPerWeek}
+Ghi chú thêm: ${data.notes ?? "không"}`;
+
+    const schema = {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        days: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              day: { type: "string", description: "VD: Thứ 2 - Push" },
+              focus: { type: "string" },
+              exercises: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    sets: { type: "number" },
+                    reps: { type: "string" },
+                    rest_sec: { type: "number" },
+                    notes: { type: "string" },
+                  },
+                  required: ["name", "sets", "reps"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["day", "focus", "exercises"],
+            additionalProperties: false,
+          },
+        },
+        notes: { type: "string" },
+      },
+      required: ["title", "days"],
+      additionalProperties: false,
+    };
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "system", content: sys }, { role: "user", content: "Tạo kế hoạch tập tuần cho tôi." }],
+        response_format: { type: "json_schema", json_schema: { name: "WorkoutPlan", strict: true, schema } },
+      }),
+    });
+
+    if (!res.ok) {
+      const t = await res.text();
+      console.error("plan ai error", res.status, t);
+      throw new Error(res.status === 429 ? "AI đang quá tải, thử lại sau." : res.status === 402 ? "Tài khoản AI hết credit." : "Không tạo được kế hoạch.");
+    }
+    const json = await res.json();
+    const content = json?.choices?.[0]?.message?.content ?? "{}";
+    const plan = JSON.parse(content);
+
+    const { data: saved, error } = await supabase
+      .from("workout_plans")
+      .insert({ user_id: userId, title: plan.title ?? "Kế hoạch tập", plan })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    return { ok: true, planId: saved.id, plan };
+  });
