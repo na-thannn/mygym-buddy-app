@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPtRouteImport } from './routes/_authenticated/pt'
 import { Route as AuthenticatedProgressRouteImport } from './routes/_authenticated/progress'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
 import { Route as AuthenticatedInbodyRouteImport } from './routes/_authenticated/inbody'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedCoachRouteImport } from './routes/_authenticated/coach'
@@ -49,6 +50,11 @@ const AuthenticatedProgressRoute = AuthenticatedProgressRouteImport.update({
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPlansRoute = AuthenticatedPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedInbodyRoute = AuthenticatedInbodyRouteImport.update({
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/coach': typeof AuthenticatedCoachRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/inbody': typeof AuthenticatedInbodyRoute
+  '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress': typeof AuthenticatedProgressRoute
   '/pt': typeof AuthenticatedPtRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/coach': typeof AuthenticatedCoachRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/inbody': typeof AuthenticatedInbodyRoute
+  '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress': typeof AuthenticatedProgressRoute
   '/pt': typeof AuthenticatedPtRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_authenticated/coach': typeof AuthenticatedCoachRoute
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/inbody': typeof AuthenticatedInbodyRoute
+  '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/progress': typeof AuthenticatedProgressRoute
   '/_authenticated/pt': typeof AuthenticatedPtRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/coach'
     | '/feed'
     | '/inbody'
+    | '/plans'
     | '/profile'
     | '/progress'
     | '/pt'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/coach'
     | '/feed'
     | '/inbody'
+    | '/plans'
     | '/profile'
     | '/progress'
     | '/pt'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/_authenticated/coach'
     | '/_authenticated/feed'
     | '/_authenticated/inbody'
+    | '/_authenticated/plans'
     | '/_authenticated/profile'
     | '/_authenticated/progress'
     | '/_authenticated/pt'
@@ -217,6 +229,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/plans': {
+      id: '/_authenticated/plans'
+      path: '/plans'
+      fullPath: '/plans'
+      preLoaderRoute: typeof AuthenticatedPlansRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/inbody': {
       id: '/_authenticated/inbody'
       path: '/inbody'
@@ -267,6 +286,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCoachRoute: typeof AuthenticatedCoachRoute
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedInbodyRoute: typeof AuthenticatedInbodyRoute
+  AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedProgressRoute: typeof AuthenticatedProgressRoute
   AuthenticatedPtRoute: typeof AuthenticatedPtRoute
@@ -279,6 +299,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCoachRoute: AuthenticatedCoachRoute,
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedInbodyRoute: AuthenticatedInbodyRoute,
+  AuthenticatedPlansRoute: AuthenticatedPlansRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedProgressRoute: AuthenticatedProgressRoute,
   AuthenticatedPtRoute: AuthenticatedPtRoute,
@@ -298,3 +319,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
