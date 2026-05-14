@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   UserCircle,
   Users,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ const NAV: NavItem[] = [
   { to: "/log/nutrition", label: "Dinh dưỡng", icon: Apple },
   { to: "/progress", label: "Tiến độ", icon: LineChart },
   { to: "/coach", label: "AI Coach", icon: MessageCircle },
+  { to: "/plans", label: "Kế hoạch", icon: ClipboardList },
   { to: "/profile", label: "Hồ sơ", icon: UserCircle },
 ];
 
