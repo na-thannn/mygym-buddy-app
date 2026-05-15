@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPtRouteImport } from './routes/_authenticated/pt'
+import { Route as AuthenticatedProgressReportRouteImport } from './routes/_authenticated/progress-report'
 import { Route as AuthenticatedProgressRouteImport } from './routes/_authenticated/progress'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
@@ -43,6 +44,12 @@ const AuthenticatedPtRoute = AuthenticatedPtRouteImport.update({
   path: '/pt',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedProgressReportRoute =
+  AuthenticatedProgressReportRouteImport.update({
+    id: '/progress-report',
+    path: '/progress-report',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedProgressRoute = AuthenticatedProgressRouteImport.update({
   id: '/progress',
   path: '/progress',
@@ -106,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress': typeof AuthenticatedProgressRoute
+  '/progress-report': typeof AuthenticatedProgressReportRoute
   '/pt': typeof AuthenticatedPtRoute
   '/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
@@ -121,6 +129,7 @@ export interface FileRoutesByTo {
   '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress': typeof AuthenticatedProgressRoute
+  '/progress-report': typeof AuthenticatedProgressReportRoute
   '/pt': typeof AuthenticatedPtRoute
   '/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
@@ -138,6 +147,7 @@ export interface FileRoutesById {
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/progress': typeof AuthenticatedProgressRoute
+  '/_authenticated/progress-report': typeof AuthenticatedProgressReportRoute
   '/_authenticated/pt': typeof AuthenticatedPtRoute
   '/_authenticated/log/nutrition': typeof AuthenticatedLogNutritionRoute
   '/_authenticated/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/profile'
     | '/progress'
+    | '/progress-report'
     | '/pt'
     | '/log/nutrition'
     | '/log/nutrition-report'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/profile'
     | '/progress'
+    | '/progress-report'
     | '/pt'
     | '/log/nutrition'
     | '/log/nutrition-report'
@@ -186,6 +198,7 @@ export interface FileRouteTypes {
     | '/_authenticated/plans'
     | '/_authenticated/profile'
     | '/_authenticated/progress'
+    | '/_authenticated/progress-report'
     | '/_authenticated/pt'
     | '/_authenticated/log/nutrition'
     | '/_authenticated/log/nutrition-report'
@@ -226,6 +239,13 @@ declare module '@tanstack/react-router' {
       path: '/pt'
       fullPath: '/pt'
       preLoaderRoute: typeof AuthenticatedPtRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/progress-report': {
+      id: '/_authenticated/progress-report'
+      path: '/progress-report'
+      fullPath: '/progress-report'
+      preLoaderRoute: typeof AuthenticatedProgressReportRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/progress': {
@@ -309,6 +329,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedProgressRoute: typeof AuthenticatedProgressRoute
+  AuthenticatedProgressReportRoute: typeof AuthenticatedProgressReportRoute
   AuthenticatedPtRoute: typeof AuthenticatedPtRoute
   AuthenticatedLogNutritionRoute: typeof AuthenticatedLogNutritionRoute
   AuthenticatedLogNutritionReportRoute: typeof AuthenticatedLogNutritionReportRoute
@@ -323,6 +344,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedProgressRoute: AuthenticatedProgressRoute,
+  AuthenticatedProgressReportRoute: AuthenticatedProgressReportRoute,
   AuthenticatedPtRoute: AuthenticatedPtRoute,
   AuthenticatedLogNutritionRoute: AuthenticatedLogNutritionRoute,
   AuthenticatedLogNutritionReportRoute: AuthenticatedLogNutritionReportRoute,
