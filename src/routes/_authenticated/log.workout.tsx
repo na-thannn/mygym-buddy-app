@@ -17,12 +17,12 @@ export const Route = createFileRoute("/_authenticated/log/workout")({
   component: WorkoutLog,
 });
 
-type Row = { id: string; performed_at: string; exercise: string; sets: number | null; reps: number | null; weight_kg: number | null; notes: string | null };
+type Row = { id: string; performed_at: string; exercise: string; workout_type: string | null; sets: number | null; reps: number | null; weight_kg: number | null; duration_min: number | null; notes: string | null };
 
 function WorkoutLog() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
-  const [f, setF] = useState({ exercise: "", sets: "", reps: "", weight_kg: "", notes: "" });
+  const [f, setF] = useState({ exercise: "", workout_type: "", sets: "", reps: "", weight_kg: "", duration_min: "", notes: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const load = async () => {
@@ -38,7 +38,9 @@ function WorkoutLog() {
     const num = (s: string) => (s ? Number(s) : null);
     const payload = {
       exercise: f.exercise.trim(),
+      workout_type: f.workout_type || null,
       sets: num(f.sets), reps: num(f.reps), weight_kg: num(f.weight_kg),
+      duration_min: num(f.duration_min),
       notes: f.notes || null,
     };
     const { error } = editingId
@@ -47,7 +49,7 @@ function WorkoutLog() {
     if (error) toast.error(error.message);
     else {
       toast.success(editingId ? "Đã cập nhật bài tập" : "Đã ghi bài tập");
-      setF({ exercise: "", sets: "", reps: "", weight_kg: "", notes: "" });
+      setF({ exercise: "", workout_type: "", sets: "", reps: "", weight_kg: "", duration_min: "", notes: "" });
       setEditingId(null);
       load();
     }
@@ -57,9 +59,11 @@ function WorkoutLog() {
     setEditingId(r.id);
     setF({
       exercise: r.exercise,
+      workout_type: r.workout_type ?? "",
       sets: r.sets?.toString() ?? "",
       reps: r.reps?.toString() ?? "",
       weight_kg: r.weight_kg?.toString() ?? "",
+      duration_min: r.duration_min?.toString() ?? "",
       notes: r.notes ?? "",
     });
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
@@ -67,7 +71,7 @@ function WorkoutLog() {
 
   const cancelEdit = () => {
     setEditingId(null);
-    setF({ exercise: "", sets: "", reps: "", weight_kg: "", notes: "" });
+    setF({ exercise: "", workout_type: "", sets: "", reps: "", weight_kg: "", duration_min: "", notes: "" });
   };
 
   const remove = async (id: string) => {
@@ -143,13 +147,19 @@ function WorkoutLog() {
         </Button>
       </div>
       <form onSubmit={submit} className="rounded-xl border border-border bg-card p-4 mb-6 space-y-3">
-        <div className="space-y-1"><Label>Bài tập</Label>
-          <Input value={f.exercise} onChange={(e) => setF({ ...f, exercise: e.target.value })} placeholder="VD: Bench Press" required maxLength={100} /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><Label>Bài tập</Label>
+            <Input value={f.exercise} onChange={(e) => setF({ ...f, exercise: e.target.value })} placeholder="VD: Bench Press" required maxLength={100} /></div>
+          <div className="space-y-1"><Label>Loại buổi tập</Label>
+            <Input value={f.workout_type} onChange={(e) => setF({ ...f, workout_type: e.target.value })} placeholder="Push / Pull / Legs / Cardio" maxLength={40} /></div>
+        </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1"><Label>Sets</Label><Input type="number" value={f.sets} onChange={(e) => setF({ ...f, sets: e.target.value })} /></div>
           <div className="space-y-1"><Label>Reps</Label><Input type="number" value={f.reps} onChange={(e) => setF({ ...f, reps: e.target.value })} /></div>
           <div className="space-y-1"><Label>Tạ (kg)</Label><Input type="number" step="0.5" value={f.weight_kg} onChange={(e) => setF({ ...f, weight_kg: e.target.value })} /></div>
         </div>
+        <div className="space-y-1"><Label>Thời lượng (phút)</Label>
+          <Input type="number" value={f.duration_min} onChange={(e) => setF({ ...f, duration_min: e.target.value })} placeholder="VD: 45" /></div>
         <div className="space-y-1"><Label>Ghi chú</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
         <div className="flex gap-2">
           <Button type="submit">{editingId ? "Lưu thay đổi" : "Thêm bài tập"}</Button>
@@ -167,7 +177,11 @@ function WorkoutLog() {
             <div className="min-w-0">
               <div className="font-medium text-sm">{r.exercise}</div>
               <div className="text-xs text-muted-foreground">
-                {formatDateTime(r.performed_at)} {r.sets && r.reps ? `• ${r.sets}×${r.reps}` : ""} {r.weight_kg ? `• ${r.weight_kg}kg` : ""}
+                {formatDateTime(r.performed_at)}
+                {r.workout_type ? ` • ${r.workout_type}` : ""}
+                {r.sets && r.reps ? ` • ${r.sets}×${r.reps}` : ""}
+                {r.weight_kg ? ` • ${r.weight_kg}kg` : ""}
+                {r.duration_min ? ` • ${r.duration_min} phút` : ""}
               </div>
               {r.notes && <div className="text-xs mt-1">{r.notes}</div>}
             </div>

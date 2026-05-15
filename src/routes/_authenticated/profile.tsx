@@ -27,6 +27,8 @@ type ProfileRow = {
   target_weight_kg: number | null;
   goal: string | null;
   bio: string | null;
+  level: string | null;
+  limitations: string | null;
 };
 
 function ProfilePage() {
@@ -59,6 +61,8 @@ function ProfilePage() {
       target_weight_kg: p.target_weight_kg,
       goal: p.goal,
       bio: p.bio,
+      level: p.level,
+      limitations: p.limitations,
     });
     setSaving(false);
     if (error) toast.error(error.message);
@@ -175,6 +179,28 @@ function ProfilePage() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <Label>Trình độ tập</Label>
+            <Select value={p.level ?? ""} onValueChange={(v) => setP({ ...p, level: v })}>
+              <SelectTrigger><SelectValue placeholder="Chọn trình độ" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="beginner">Người mới (Beginner)</SelectItem>
+                <SelectItem value="intermediate">Trung cấp (Intermediate)</SelectItem>
+                <SelectItem value="advanced">Nâng cao (Advanced)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label>Hạn chế / Chấn thương</Label>
+          <Textarea
+            value={p.limitations ?? ""}
+            onChange={(e) => setP({ ...p, limitations: e.target.value })}
+            rows={2}
+            maxLength={300}
+            placeholder="VD: đau lưng dưới, không squat nặng. Nếu không có, ghi 'không'."
+          />
         </div>
 
         <div className="space-y-1">

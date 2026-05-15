@@ -14,6 +14,8 @@ import {
   UserCircle,
   Users,
   ClipboardList,
+  FileText,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,9 +26,12 @@ const NAV: NavItem[] = [
   { to: "/inbody", label: "InBody", icon: Scale },
   { to: "/log/workout", label: "Tập luyện", icon: Dumbbell },
   { to: "/log/nutrition", label: "Dinh dưỡng", icon: Apple },
+  { to: "/log/nutrition-report", label: "Báo cáo DD", icon: FileText },
   { to: "/progress", label: "Tiến độ", icon: LineChart },
+  { to: "/progress-report", label: "BC Tiến độ", icon: FileText },
   { to: "/coach", label: "AI Coach", icon: MessageCircle },
   { to: "/plans", label: "Kế hoạch", icon: ClipboardList },
+  { to: "/analyses", label: "Phân tích AI", icon: Sparkles },
   { to: "/profile", label: "Hồ sơ", icon: UserCircle },
 ];
 
