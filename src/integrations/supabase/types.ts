@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      analyses: {
+        Row: {
+          content_md: string
+          created_at: string
+          id: string
+          plan_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_md: string
+          created_at?: string
+          id?: string
+          plan_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_md?: string
+          created_at?: string
+          id?: string
+          plan_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       coach_messages: {
         Row: {
           content: string
@@ -166,6 +193,66 @@ export type Database = {
         }
         Relationships: []
       }
+      nutrition_reports: {
+        Row: {
+          breakfast: string | null
+          calories: number | null
+          carbs_g: number | null
+          created_at: string
+          day_type: string | null
+          dinner: string | null
+          fats_g: number | null
+          id: string
+          lunch: string | null
+          notes: string | null
+          post_workout_meal: string | null
+          pre_workout_meal: string | null
+          protein_g: number | null
+          report_date: string
+          snacks: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          breakfast?: string | null
+          calories?: number | null
+          carbs_g?: number | null
+          created_at?: string
+          day_type?: string | null
+          dinner?: string | null
+          fats_g?: number | null
+          id?: string
+          lunch?: string | null
+          notes?: string | null
+          post_workout_meal?: string | null
+          pre_workout_meal?: string | null
+          protein_g?: number | null
+          report_date?: string
+          snacks?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          breakfast?: string | null
+          calories?: number | null
+          carbs_g?: number | null
+          created_at?: string
+          day_type?: string | null
+          dinner?: string | null
+          fats_g?: number | null
+          id?: string
+          lunch?: string | null
+          notes?: string | null
+          post_workout_meal?: string | null
+          pre_workout_meal?: string | null
+          protein_g?: number | null
+          report_date?: string
+          snacks?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           content: string
@@ -263,6 +350,8 @@ export type Database = {
           goal: string | null
           height_cm: number | null
           id: string
+          level: string | null
+          limitations: string | null
           target_weight_kg: number | null
           updated_at: string
         }
@@ -277,6 +366,8 @@ export type Database = {
           goal?: string | null
           height_cm?: number | null
           id: string
+          level?: string | null
+          limitations?: string | null
           target_weight_kg?: number | null
           updated_at?: string
         }
@@ -291,8 +382,46 @@ export type Database = {
           goal?: string | null
           height_cm?: number | null
           id?: string
+          level?: string | null
+          limitations?: string | null
           target_weight_kg?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      progress_reports: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          report_date: string
+          streak_days: number | null
+          total_sessions: number | null
+          total_volume: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          report_date?: string
+          streak_days?: number | null
+          total_sessions?: number | null
+          total_volume?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          report_date?: string
+          streak_days?: number | null
+          total_sessions?: number | null
+          total_volume?: number | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -368,6 +497,7 @@ export type Database = {
       workout_logs: {
         Row: {
           created_at: string
+          duration_min: number | null
           exercise: string
           id: string
           notes: string | null
@@ -376,9 +506,11 @@ export type Database = {
           sets: number | null
           user_id: string
           weight_kg: number | null
+          workout_type: string | null
         }
         Insert: {
           created_at?: string
+          duration_min?: number | null
           exercise: string
           id?: string
           notes?: string | null
@@ -387,9 +519,11 @@ export type Database = {
           sets?: number | null
           user_id: string
           weight_kg?: number | null
+          workout_type?: string | null
         }
         Update: {
           created_at?: string
+          duration_min?: number | null
           exercise?: string
           id?: string
           notes?: string | null
@@ -398,6 +532,37 @@ export type Database = {
           sets?: number | null
           user_id?: string
           weight_kg?: number | null
+          workout_type?: string | null
+        }
+        Relationships: []
+      }
+      workout_plan_docs: {
+        Row: {
+          content_md: string
+          created_at: string
+          id: string
+          plan_date: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_md: string
+          created_at?: string
+          id?: string
+          plan_date?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_md?: string
+          created_at?: string
+          id?: string
+          plan_date?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
