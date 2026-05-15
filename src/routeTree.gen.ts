@@ -20,6 +20,7 @@ import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedInbodyRouteImport } from './routes/_authenticated/inbody'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedCoachRouteImport } from './routes/_authenticated/coach'
+import { Route as AuthenticatedAnalysesRouteImport } from './routes/_authenticated/analyses'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedLogWorkoutRouteImport } from './routes/_authenticated/log.workout'
 import { Route as AuthenticatedLogNutritionReportRouteImport } from './routes/_authenticated/log.nutrition-report'
@@ -80,6 +81,11 @@ const AuthenticatedCoachRoute = AuthenticatedCoachRouteImport.update({
   path: '/coach',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAnalysesRoute = AuthenticatedAnalysesRouteImport.update({
+  id: '/analyses',
+  path: '/analyses',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/analyses': typeof AuthenticatedAnalysesRoute
   '/coach': typeof AuthenticatedCoachRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/inbody': typeof AuthenticatedInbodyRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/analyses': typeof AuthenticatedAnalysesRoute
   '/coach': typeof AuthenticatedCoachRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/inbody': typeof AuthenticatedInbodyRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/analyses': typeof AuthenticatedAnalysesRoute
   '/_authenticated/coach': typeof AuthenticatedCoachRoute
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/inbody': typeof AuthenticatedInbodyRoute
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/admin'
+    | '/analyses'
     | '/coach'
     | '/feed'
     | '/inbody'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/admin'
+    | '/analyses'
     | '/coach'
     | '/feed'
     | '/inbody'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/admin'
+    | '/_authenticated/analyses'
     | '/_authenticated/coach'
     | '/_authenticated/feed'
     | '/_authenticated/inbody'
@@ -290,6 +302,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoachRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/analyses': {
+      id: '/_authenticated/analyses'
+      path: '/analyses'
+      fullPath: '/analyses'
+      preLoaderRoute: typeof AuthenticatedAnalysesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -323,6 +342,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAnalysesRoute: typeof AuthenticatedAnalysesRoute
   AuthenticatedCoachRoute: typeof AuthenticatedCoachRoute
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedInbodyRoute: typeof AuthenticatedInbodyRoute
@@ -338,6 +358,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAnalysesRoute: AuthenticatedAnalysesRoute,
   AuthenticatedCoachRoute: AuthenticatedCoachRoute,
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedInbodyRoute: AuthenticatedInbodyRoute,
