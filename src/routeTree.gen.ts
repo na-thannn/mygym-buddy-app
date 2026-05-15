@@ -21,6 +21,7 @@ import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/f
 import { Route as AuthenticatedCoachRouteImport } from './routes/_authenticated/coach'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedLogWorkoutRouteImport } from './routes/_authenticated/log.workout'
+import { Route as AuthenticatedLogNutritionReportRouteImport } from './routes/_authenticated/log.nutrition-report'
 import { Route as AuthenticatedLogNutritionRouteImport } from './routes/_authenticated/log.nutrition'
 
 const AuthRoute = AuthRouteImport.update({
@@ -82,6 +83,12 @@ const AuthenticatedLogWorkoutRoute = AuthenticatedLogWorkoutRouteImport.update({
   path: '/log/workout',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedLogNutritionReportRoute =
+  AuthenticatedLogNutritionReportRouteImport.update({
+    id: '/log/nutrition-report',
+    path: '/log/nutrition-report',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedLogNutritionRoute =
   AuthenticatedLogNutritionRouteImport.update({
     id: '/log/nutrition',
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/progress': typeof AuthenticatedProgressRoute
   '/pt': typeof AuthenticatedPtRoute
   '/log/nutrition': typeof AuthenticatedLogNutritionRoute
+  '/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
 export interface FileRoutesByTo {
@@ -115,6 +123,7 @@ export interface FileRoutesByTo {
   '/progress': typeof AuthenticatedProgressRoute
   '/pt': typeof AuthenticatedPtRoute
   '/log/nutrition': typeof AuthenticatedLogNutritionRoute
+  '/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
 export interface FileRoutesById {
@@ -131,6 +140,7 @@ export interface FileRoutesById {
   '/_authenticated/progress': typeof AuthenticatedProgressRoute
   '/_authenticated/pt': typeof AuthenticatedPtRoute
   '/_authenticated/log/nutrition': typeof AuthenticatedLogNutritionRoute
+  '/_authenticated/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/_authenticated/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
 export interface FileRouteTypes {
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/progress'
     | '/pt'
     | '/log/nutrition'
+    | '/log/nutrition-report'
     | '/log/workout'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/progress'
     | '/pt'
     | '/log/nutrition'
+    | '/log/nutrition-report'
     | '/log/workout'
   id:
     | '__root__'
@@ -176,6 +188,7 @@ export interface FileRouteTypes {
     | '/_authenticated/progress'
     | '/_authenticated/pt'
     | '/_authenticated/log/nutrition'
+    | '/_authenticated/log/nutrition-report'
     | '/_authenticated/log/workout'
   fileRoutesById: FileRoutesById
 }
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLogWorkoutRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/log/nutrition-report': {
+      id: '/_authenticated/log/nutrition-report'
+      path: '/log/nutrition-report'
+      fullPath: '/log/nutrition-report'
+      preLoaderRoute: typeof AuthenticatedLogNutritionReportRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/log/nutrition': {
       id: '/_authenticated/log/nutrition'
       path: '/log/nutrition'
@@ -291,6 +311,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProgressRoute: typeof AuthenticatedProgressRoute
   AuthenticatedPtRoute: typeof AuthenticatedPtRoute
   AuthenticatedLogNutritionRoute: typeof AuthenticatedLogNutritionRoute
+  AuthenticatedLogNutritionReportRoute: typeof AuthenticatedLogNutritionReportRoute
   AuthenticatedLogWorkoutRoute: typeof AuthenticatedLogWorkoutRoute
 }
 
@@ -304,6 +325,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProgressRoute: AuthenticatedProgressRoute,
   AuthenticatedPtRoute: AuthenticatedPtRoute,
   AuthenticatedLogNutritionRoute: AuthenticatedLogNutritionRoute,
+  AuthenticatedLogNutritionReportRoute: AuthenticatedLogNutritionReportRoute,
   AuthenticatedLogWorkoutRoute: AuthenticatedLogWorkoutRoute,
 }
 
@@ -319,3 +341,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
