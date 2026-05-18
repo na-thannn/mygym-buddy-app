@@ -1,92 +1,112 @@
+## Goal
 
-# Tích hợp HL Fitness ↔ SharePoint (Microsoft Graph)
+Recreate the exported Copilot Studio "Personal Gym Trainer" agent as a local-first web app:
+- **DB**: SQLite (`better-sqlite3`) via Drizzle ORM, file at `./data/app.db`
+- **Auth**: local email+password using Lucia-style sessions (httpOnly cookie + sessions table)
+- **AI**: Groq API (`llama-3.3-70b-versatile`) via OpenAI-compatible endpoint, your own `GROQ_API_KEY`
+- **UX**: chat-first "Alex" trainer at `/trainer` that drives the conversation with tool calls, exactly like Copilot Studio. Form pages stay as a fallback.
 
-Web sẽ đọc/ghi thẳng vào SharePoint qua Microsoft Graph API. Lovable Cloud chỉ giữ auth + bảng `profiles` tối thiểu (để map user) + các bảng xã hội (`posts`, `coach_threads`…). Toàn bộ profile chi tiết, log workout/meal/inbody, plan & analysis sẽ nằm trên SharePoint — đúng nguồn dữ liệu mà agent Copilot Studio đang dùng.
+## Reality checks before you confirm
 
----
+1. **Lovable preview will stop working after this rewrite.** `better-sqlite3` is a native Node addon that cannot run on Cloudflare Workers. To demo, you run `bun install && bun run dev` on your laptop and show `http://localhost:3000`. The Lovable cloud preview URL will 500.
+2. **You answered "Keep everything" earlier.** Feed, PT booking, Admin, InBody, coach threads etc. were Supabase-specific (RLS + storage + realtime). Faithfully porting all of that to SQLite triples the work and isn't part of the agent. **Recommendation: keep only what the agent covers** (Profile, Workout Plan, Log Workout, Log Nutrition, Progress, Analyses, Trainer chat). I'll proceed this way unless you say otherwise — Feed/PT/Admin/InBody/Coach will be deleted.
+3. **Supabase wiring stays installed but unused** during the migration. We won't touch `src/integrations/supabase/*` files (Lovable manages them); we just stop importing them.
 
-## Phần 1 — Bạn cần chuẩn bị bên Microsoft 365 (tôi không làm thay được)
+## What we build (mirrors the agent 1:1)
 
-### A. Tạo Azure AD App Registration
-1. Vào https://entra.microsoft.com → **Applications → App registrations → New registration**.
-2. Name: `HL Fitness Web`. Supported account types: **Single tenant**. Redirect URI: bỏ trống. → **Register**.
-3. Ghi lại **Application (client) ID** và **Directory (tenant) ID**.
-4. **Certificates & secrets → New client secret** (hạn 24 tháng) → copy **Value** (chỉ hiện 1 lần).
-5. **API permissions → Add permission → Microsoft Graph → Application permissions**, thêm:
-   - `Sites.Selected` (an toàn nhất, chỉ site bạn cấp) **hoặc** `Sites.ReadWrite.All`
-   - `Files.ReadWrite.All`
-6. Bấm **Grant admin consent**.
-7. Nếu chọn `Sites.Selected`: dùng PowerShell/Graph Explorer cấp quyền `write` cho app trên đúng site SharePoint.
+### Topics → routes/tools
+| Agent topic | Implementation |
+|---|---|
+| ConversationStart / Greeting (profile setup) | Tool `save_profile` + chat flow asks goal, level, limitations, age, weight, height |
+| GenerateAndSaveWorkoutPlan | Tool `generate_workout_plan` → Groq → save Markdown to `workout_plan_docs` keyed by date |
+| ExportWorkoutPlan (log session, loops) | Tool `log_workout_entry`, chat asks again "log another?" |
+| ExportNutritionAdviceTopic (+ Estimate Macros AI) | Tool `log_nutrition_report` → second Groq call to estimate macros → save |
+| ExportUserProgressTopic | Tool `log_progress_report` |
+| CompareProgresstoPlan (+ Analyse Progress AI) | Tools `get_plan_md` + `get_recent_workouts` + `analyze_progress` → save `.md` to `analyses` |
+| MotivationBoost / RestDayAdvice | Tools with the 4 canned options each (from the export) |
+| Fallback / general fitness Q&A | Default model behavior |
 
-### B. Lấy thông tin SharePoint
-- **Site ID**: gọi `GET https://graph.microsoft.com/v1.0/sites/{tenant}.sharepoint.com:/sites/{site-name}` → field `id` (dạng `tenant.sharepoint.com,guid,guid`).
-- **List ID** của list Profile.
-- **Drive item ID** (hoặc đường dẫn) của file Excel logs và folder chứa file `.md`.
+### Form pages (kept as backup UI, simplified)
+- `/profile` — edit profile
+- `/plans` — list saved `workout_plan_docs` (Markdown)
+- `/analyses` — list saved analyses
+- `/log/workout`, `/log/nutrition-report`, `/progress-report` — direct entry
+- `/trainer` — primary chat surface
 
-### C. Secrets cần add vào Lovable
-Sau khi có đủ, tôi sẽ gọi tool add secret cho:
-- `MS_TENANT_ID`
-- `MS_CLIENT_ID`
-- `MS_CLIENT_SECRET`
-- `SP_SITE_ID`
-- `SP_PROFILE_LIST_ID`
-- `SP_LOGS_DRIVE_ID` + `SP_LOGS_ITEM_ID` (file Excel)
-- `SP_PLANS_DRIVE_ID` + `SP_PLANS_FOLDER_PATH`
-- (tuỳ chọn) `COPILOT_DIRECTLINE_SECRET` nếu muốn nhúng agent vào trang `/coach`.
+## Technical plan
 
----
+### Dependencies to add
+- `better-sqlite3`, `drizzle-orm`, `drizzle-kit`
+- `@oslojs/crypto`, `@oslojs/encoding` (session token hashing)
+- `@ai-sdk/openai-compatible`, `ai`, `@ai-sdk/react`, `zod`
+- `react-markdown`, `remark-gfm`
+- AI Elements components for the chat UI
 
-## Phần 2 — Việc tôi sẽ build trong web
+### Files
 
-### 1. Lớp Graph client (`src/lib/sharepoint.server.ts`)
-- Hàm `getGraphToken()`: client-credentials flow → cache token in-memory theo `expires_in`.
-- Helper `graph(path, init)` tự gắn `Authorization: Bearer …`, retry 1 lần khi 401.
+```text
+data/app.db                       SQLite file (gitignored)
+src/server/db/
+  schema.ts                       Drizzle tables (users, sessions, profiles, workout_logs, ...)
+  client.ts                       better-sqlite3 + drizzle instance (server-only)
+  migrate.ts                      runs on dev startup
+src/server/auth/
+  session.ts                      createSession, validateSession, invalidateSession
+  password.ts                     hash/verify with scrypt
+  middleware.ts                   requireAuth server-fn middleware reading session cookie
+src/lib/
+  auth.functions.ts               signUp, signIn, signOut, getCurrentUser
+  profile.functions.ts            getProfile, saveProfile
+  workout.functions.ts            logEntry, listRecent
+  nutrition.functions.ts          saveReport (+ Groq macro estimate)
+  progress.functions.ts           saveReport
+  plans.functions.ts              savePlan, listPlans, getPlan (Markdown CRUD)
+  analyses.functions.ts           saveAnalysis, listAnalyses
+  trainer/
+    groq.ts                       createGroq() helper, baseURL https://api.groq.com/openai/v1
+    tools.ts                      AI SDK tool definitions calling the server fns above
+src/routes/api/chat.ts            streamText route used by /trainer
+src/routes/_authenticated/
+  trainer.tsx                     PrimaryChat (AI Elements)
+  profile.tsx, plans.tsx, ...     existing forms, ported to new server fns
+src/lib/auth.tsx                  rewritten AuthProvider (calls auth.functions, no Supabase)
+```
 
-### 2. Server functions (`src/lib/sharepoint.functions.ts`)
-Mỗi hàm bọc `requireSupabaseAuth` để biết `userId`, rồi map sang khoá SharePoint (email user hoặc cột `LovableUserId` trong List).
-- Profile: `getProfile`, `upsertProfile` → SharePoint List items (`/sites/{id}/lists/{id}/items`).
-- Workout/Meal/InBody: `appendWorkout`, `appendMeal`, `appendInbody`, `listWorkouts(range)`, `listMeals(range)`, `listInbody()` → Excel `workbook/tables/{name}/rows` (xem skill `microsoft_excel`).
-- Plans & Analysis: `listPlans`, `readPlan(name)`, `savePlan(name, md)`, `saveAnalysis(name, md)` → `/drive/items/{id}/children` + `PUT /content` cho `.md`.
-- AI sinh plan/analysis: vẫn gọi Lovable AI Gateway như hiện tại, output Markdown rồi `savePlan` lên SharePoint thay vì insert Postgres.
+### AI client
+```ts
+// src/lib/trainer/groq.ts
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+export const groq = createOpenAICompatible({
+  name: "groq",
+  baseURL: "https://api.groq.com/openai/v1",
+  apiKey: process.env.GROQ_API_KEY!,
+});
+export const ALEX_MODEL = groq("llama-3.3-70b-versatile");
+```
 
-### 3. Map user
-Thêm cột text `sharepoint_key` vào `profiles` (mặc định = email từ `auth.users`). Nếu user trên SharePoint List dùng email khác, cho phép chỉnh trong trang Profile.
+### System prompt (from the export)
+Use Alex's responseInstructions verbatim: encouraging tone, plans in tables, nutrition in bullets, redirect injuries to physio. Injects current profile into the system message so tools have context.
 
-### 4. Refactor các trang hiện có
-- `/profile` → đọc/ghi qua `getProfile/upsertProfile` thay cho Postgres.
-- `/inbody`, `/log/workout`, `/log/nutrition`, `/progress` → gọi server fn SharePoint, dùng `useQuery` + `useServerFn`. Bỏ insert vào Postgres tương ứng.
-- `/plans` → list từ folder `.md`, click mở viewer markdown (dùng `react-markdown`, đã sẵn ý tưởng). Nút "Tạo plan" gọi AI rồi `savePlan`.
-- Coach: thêm tab "Phân tích" gọi `saveAnalysis` so sánh plan ↔ workout thực tế.
+### Tool calling loop
+`streamText` with `stopWhen: stepCountIs(50)`, tools defined per-flow. The chat is the agent — tools persist data, model writes the prose.
 
-### 5. Dọn dẹp DB Lovable
-Sau khi UI mới chạy ổn:
-- Drop (hoặc giữ archive) các bảng `inbody_entries`, `workout_logs`, `meal_logs`, `workout_plans`.
-- Giữ: `profiles` (rút gọn), `user_roles`, `pt_applications`, `pt_presence`, `posts`, `post_likes`, `post_comments`, `coach_threads`, `coach_messages`.
-- Storage bucket `inbody/meals/posts` vẫn giữ cho ảnh feed (Excel không tiện chứa ảnh). InBody scan có thể upload thẳng SharePoint qua `PUT /drive/items/.../content`.
+### Files to delete (agent has no equivalent)
+`src/routes/_authenticated/{admin,coach,feed,inbody,pt,log.nutrition,log.workout}.tsx` will be either deleted or rewritten. AppLayout nav stripped.
 
-### 6. (Tuỳ chọn) Nhúng agent Copilot Studio vào `/coach`
-Hai lựa chọn:
-- **Web Chat iframe** publish sẵn từ Copilot Studio — nhanh nhất, 5 phút.
-- **Direct Line API**: server fn `getDirectLineToken` đổi secret → token, frontend dùng `botframework-webchat`. Cho phép truyền `userId` để agent biết bạn là ai và lấy đúng record SharePoint.
+### Migration order
+1. Add deps + scaffold `src/server/db` and `src/server/auth` (no UI change yet)
+2. Add `GROQ_API_KEY` secret
+3. Rewrite `auth.tsx` + `/auth` route to use local sessions
+4. Port form pages one-by-one to new server fns (Profile first)
+5. Build `/trainer` chat with full tool set
+6. Delete unused pages, clean nav
+7. README with `bun install && bun run dev` instructions for your professor
 
----
+## What you must accept
 
-## Phần 3 — Rủi ro & lưu ý
+- ☐ Lovable preview URL won't work after this; you demo by running locally
+- ☐ Feed, PT booking, Admin, InBody, Coach pages are deleted (overrides your "keep everything" answer — the agent doesn't have them)
+- ☐ Existing Supabase data is abandoned (the SQLite DB starts empty)
+- ☐ I'll request `GROQ_API_KEY` via the secrets form once you approve
 
-- **Throttling Graph**: ~10 req/s/app/site. Gom batch (`/$batch`) khi load dashboard.
-- **Excel concurrency**: tạo `workbookSession` `persistChanges:true` cho mỗi request ghi, đóng sau khi xong; tránh 2 user ghi cùng lúc gây lock — dùng retry với jitter.
-- **Latency** cao hơn Postgres (200–600ms). UI cần skeleton + optimistic update.
-- **Mất Realtime** cho log cá nhân (Graph không có websocket). Nếu cần live, fallback: poll mỗi 15s ở trang đang mở.
-- **RLS** không còn cho dữ liệu cá nhân — bảo mật phụ thuộc server fn check `userId` trước khi map sang SharePoint key. Tuyệt đối không expose Graph token ra client.
-- **Backup**: SharePoint version history bật sẵn cho file Excel/.md.
-
----
-
-## Thứ tự triển khai
-1. Bạn hoàn tất Phần 1 (Azure app + lấy IDs) → tôi add secrets.
-2. Tôi build Graph client + 1 server fn mẫu (`getProfile`) + test bằng `invoke-server-function`.
-3. Refactor lần lượt: Profile → InBody → Workout → Meal → Progress → Plans → Analysis.
-4. Nhúng Copilot Studio vào `/coach` (nếu muốn).
-5. Drop bảng cũ trong Postgres.
-
-Khi bạn xong Phần 1, gửi lại 8 giá trị secret ở mục C — tôi sẽ kích hoạt form add-secret an toàn, không cần dán trong chat.
+Reply "go" and I'll start with step 1. If you'd rather keep Lovable Cloud + just swap AI to Groq (Option A from before, much smaller), say so now — last chance to switch.
