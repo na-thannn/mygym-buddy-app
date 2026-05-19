@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { signIn, signUp } from "@/lib/auth.functions";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,31 +9,22 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { z } from "zod";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
     mode: (s.mode as string) === "signup" ? "signup" : "login",
-    redirect: (s.redirect as string) || "/feed",
+    redirect: (s.redirect as string) || "/trainer",
   }),
   component: AuthPage,
 });
 
-const signupSchema = z.object({
-  email: z.string().trim().email("Email không hợp lệ").max(255),
-  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự").max(72),
-  displayName: z.string().trim().min(1, "Vui lòng nhập tên").max(60),
-});
-const loginSchema = z.object({
-  email: z.string().trim().email("Email không hợp lệ").max(255),
-  password: z.string().min(1, "Vui lòng nhập mật khẩu").max(72),
-});
-
 function AuthPage() {
   const { mode, redirect } = Route.useSearch();
-  const { user, loading } = useAuth();
+  const { user, loading, refresh } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const doSignIn = useServerFn(signIn);
+  const doSignUp = useServerFn(signUp);
 
   useEffect(() => {
     if (!loading && user) navigate({ to: redirect });
@@ -41,47 +33,41 @@ function AuthPage() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const parsed = loginSchema.safeParse({
-      email: fd.get("email"),
-      password: fd.get("password"),
-    });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
-      return;
-    }
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword(parsed.data);
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success("Đăng nhập thành công");
+    try {
+      await doSignIn({
+        data: {
+          email: String(fd.get("email") ?? ""),
+          password: String(fd.get("password") ?? ""),
+        },
+      });
+      await refresh();
+      toast.success("Đăng nhập thành công");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Đăng nhập thất bại");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const parsed = signupSchema.safeParse({
-      email: fd.get("email"),
-      password: fd.get("password"),
-      displayName: fd.get("displayName"),
-    });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
-      return;
-    }
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
-      email: parsed.data.email,
-      password: parsed.data.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/feed`,
-        data: { display_name: parsed.data.displayName },
-      },
-    });
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Đăng ký thành công. Vui lòng kiểm tra email để xác thực.");
+    try {
+      await doSignUp({
+        data: {
+          email: String(fd.get("email") ?? ""),
+          password: String(fd.get("password") ?? ""),
+          displayName: String(fd.get("displayName") ?? ""),
+        },
+      });
+      await refresh();
+      toast.success("Đã tạo tài khoản");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Đăng ký thất bại");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -92,9 +78,8 @@ function AuthPage() {
           <div className="size-9 rounded-md bg-primary text-primary-foreground grid place-items-center">
             <Activity className="size-5" />
           </div>
-          <div className="font-bold">HL Fitness</div>
+          <div className="font-bold">HL Fitness · Alex AI</div>
         </Link>
-
         <div className="rounded-xl border border-border bg-card p-6">
           <Tabs defaultValue={mode}>
             <TabsList className="w-full">
@@ -123,7 +108,7 @@ function AuthPage() {
               <form onSubmit={handleSignup} className="space-y-3 mt-4">
                 <div className="space-y-1">
                   <Label htmlFor="su-name">Tên hiển thị</Label>
-                  <Input id="su-name" name="displayName" required />
+                  <Input id="su-name" name="displayName" required minLength={1} maxLength={60} />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="su-email">Email</Label>
@@ -137,9 +122,6 @@ function AuthPage() {
                   {busy && <Loader2 className="size-4 mr-2 animate-spin" />}
                   Tạo tài khoản
                 </Button>
-                <p className="text-[11px] text-muted-foreground text-center">
-                  Bằng việc đăng ký, bạn đồng ý làm thành viên của HL Fitness 303 Lê Thanh Nghị.
-                </p>
               </form>
             </TabsContent>
           </Tabs>
