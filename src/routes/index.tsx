@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Activity, Apple, Dumbbell, LineChart, MapPin, MessageCircle, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -39,10 +39,10 @@ function Landing() {
           </div>
           <div className="flex gap-2">
             <Button asChild variant="ghost" size="sm">
-              <Link to="/auth">Đăng nhập</Link>
+              <Link to="/auth" search={{ mode: "login", redirect: "/trainer" }}>Đăng nhập</Link>
             </Button>
             <Button asChild size="sm">
-              <Link to="/auth" search={{ mode: "signup" }}>Tham gia</Link>
+              <Link to="/auth" search={{ mode: "signup", redirect: "/trainer" }}>Tham gia</Link>
             </Button>
           </div>
         </div>
@@ -61,10 +61,10 @@ function Landing() {
         </p>
         <div className="mt-8 flex items-center justify-center gap-3">
           <Button asChild size="lg">
-            <Link to="/auth" search={{ mode: "signup" }}>Bắt đầu miễn phí</Link>
+            <Link to="/auth" search={{ mode: "signup", redirect: "/trainer" }}>Bắt đầu miễn phí</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link to="/auth">Đã có tài khoản</Link>
+            <Link to="/auth" search={{ mode: "login", redirect: "/trainer" }}>Đã có tài khoản</Link>
           </Button>
         </div>
       </section>

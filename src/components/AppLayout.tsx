@@ -1,42 +1,33 @@
-import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
   Activity,
-  Apple,
-  Dumbbell,
-  Home,
-  LineChart,
-  LogOut,
-  MessageCircle,
-  Scale,
-  ShieldCheck,
-  UserCircle,
-  Users,
   ClipboardList,
+  Dumbbell,
   FileText,
+  LogOut,
   Sparkles,
+  UserCircle,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type NavItem = { to: string; label: string; icon: typeof Home; roles?: ("admin" | "pt" | "user")[] };
+type NavItem = { to: string; label: string; icon: typeof Activity };
 
 const NAV: NavItem[] = [
-  { to: "/feed", label: "Bảng tin", icon: Home },
-  { to: "/inbody", label: "InBody", icon: Scale },
-  { to: "/log/workout", label: "Tập luyện", icon: Dumbbell },
-  { to: "/log/nutrition", label: "Dinh dưỡng", icon: Apple },
-  { to: "/log/nutrition-report", label: "Báo cáo DD", icon: FileText },
-  { to: "/progress", label: "Tiến độ", icon: LineChart },
-  { to: "/progress-report", label: "BC Tiến độ", icon: FileText },
-  { to: "/coach", label: "AI Coach", icon: MessageCircle },
-  { to: "/plans", label: "Kế hoạch", icon: ClipboardList },
-  { to: "/analyses", label: "Phân tích AI", icon: Sparkles },
+  { to: "/trainer", label: "Alex Chat", icon: MessageCircle },
   { to: "/profile", label: "Hồ sơ", icon: UserCircle },
+  { to: "/log/workout", label: "Nhật ký tập", icon: Dumbbell },
+  { to: "/log/nutrition-report", label: "Dinh dưỡng", icon: FileText },
+  { to: "/progress-report", label: "Tiến độ", icon: FileText },
+  { to: "/plans", label: "Kế hoạch", icon: ClipboardList },
+  { to: "/analyses", label: "Phân tích", icon: Sparkles },
 ];
 
-export function AppLayout() {
-  const { user, role, signOut } = useAuth();
+export function AppLayout({ children }: { children?: ReactNode }) {
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const loc = useLocation();
 
@@ -45,24 +36,19 @@ export function AppLayout() {
     navigate({ to: "/" });
   };
 
-  const items: NavItem[] = [...NAV];
-  if (role === "pt" || role === "admin") items.push({ to: "/pt", label: "PT Dashboard", icon: Users });
-  if (role === "admin") items.push({ to: "/admin", label: "Quản trị", icon: ShieldCheck });
-
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Sidebar (desktop) */}
       <aside className="hidden md:flex w-60 shrink-0 border-r border-border flex-col p-4 gap-1 sticky top-0 h-screen">
-        <Link to="/feed" className="flex items-center gap-2 px-2 py-3 mb-2">
+        <Link to="/trainer" className="flex items-center gap-2 px-2 py-3 mb-2">
           <div className="size-8 rounded-md bg-primary text-primary-foreground grid place-items-center">
             <Activity className="size-5" />
           </div>
           <div>
             <div className="font-bold leading-none">HL Fitness</div>
-            <div className="text-[10px] text-muted-foreground">303 Lê Thanh Nghị</div>
+            <div className="text-[10px] text-muted-foreground">with Alex AI</div>
           </div>
         </Link>
-        {items.map((it) => {
+        {NAV.map((it) => {
           const active = loc.pathname === it.to || loc.pathname.startsWith(it.to + "/");
           const Icon = it.icon;
           return (
@@ -71,7 +57,9 @@ export function AppLayout() {
               to={it.to}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                active ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                active
+                  ? "bg-accent text-accent-foreground font-medium"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               )}
             >
               <Icon className="size-4" />
@@ -88,9 +76,8 @@ export function AppLayout() {
         </div>
       </aside>
 
-      {/* Mobile top bar */}
       <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-background sticky top-0 z-20">
-        <Link to="/feed" className="flex items-center gap-2">
+        <Link to="/trainer" className="flex items-center gap-2">
           <div className="size-7 rounded-md bg-primary text-primary-foreground grid place-items-center">
             <Activity className="size-4" />
           </div>
@@ -101,14 +88,10 @@ export function AppLayout() {
         </Button>
       </header>
 
-      {/* Content */}
-      <main className="flex-1 min-w-0 pb-20 md:pb-6">
-        <Outlet />
-      </main>
+      <main className="flex-1 min-w-0 pb-20 md:pb-6">{children}</main>
 
-      {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-background border-t border-border flex items-center justify-around px-1 py-1">
-        {items.slice(0, 5).map((it) => {
+        {NAV.slice(0, 5).map((it) => {
           const active = loc.pathname === it.to || loc.pathname.startsWith(it.to + "/");
           const Icon = it.icon;
           return (
