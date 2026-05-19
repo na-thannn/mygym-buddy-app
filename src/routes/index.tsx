@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Activity, Apple, Dumbbell, LineChart, MapPin, MessageCircle, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
