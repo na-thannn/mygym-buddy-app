@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/chat")({
         const result = streamText({
           model: groq(ALEX_MODEL_ID),
           system: SYSTEM,
-          messages: convertToModelMessages(messages),
+          messages: await convertToModelMessages(messages),
           tools,
           stopWhen: stepCountIs(50),
         });
