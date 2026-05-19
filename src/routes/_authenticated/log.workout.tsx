@@ -1,198 +1,110 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
+import { useCallback, useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { listRecentWorkouts, logWorkoutEntry } from "@/lib/workout.functions";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Download, FileText, Pencil, Trash2, X } from "lucide-react";
-import { formatDateTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/log/workout")({
   head: () => ({ meta: [{ title: "Nhật ký tập — HL Fitness" }] }),
   component: WorkoutLog,
 });
 
-type Row = { id: string; performed_at: string; exercise: string; workout_type: string | null; sets: number | null; reps: number | null; weight_kg: number | null; duration_min: number | null; notes: string | null };
+type Row = Awaited<ReturnType<typeof listRecentWorkouts>>[number];
+
+const today = () => new Date().toISOString().slice(0, 10);
 
 function WorkoutLog() {
-  const { user } = useAuth();
+  const list = useServerFn(listRecentWorkouts);
+  const create = useServerFn(logWorkoutEntry);
   const [rows, setRows] = useState<Row[]>([]);
-  const [f, setF] = useState({ exercise: "", workout_type: "", sets: "", reps: "", weight_kg: "", duration_min: "", notes: "" });
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [f, setF] = useState({
+    performedAt: today(),
+    dayLabel: "",
+    muscleGroup: "",
+    exercise: "",
+    sets: "",
+    reps: "",
+    weightKg: "",
+    notes: "",
+  });
 
-  const load = async () => {
-    if (!user) return;
-    const { data } = await supabase.from("workout_logs").select("*").eq("user_id", user.id).order("performed_at", { ascending: false }).limit(100);
-    setRows((data as Row[]) ?? []);
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [user]);
+  const load = useCallback(async () => {
+    const data = await list({ data: { limit: 50 } });
+    setRows(data);
+  }, [list]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !f.exercise.trim()) return;
+    if (!f.exercise.trim()) return;
     const num = (s: string) => (s ? Number(s) : null);
-    const payload = {
-      exercise: f.exercise.trim(),
-      workout_type: f.workout_type || null,
-      sets: num(f.sets), reps: num(f.reps), weight_kg: num(f.weight_kg),
-      duration_min: num(f.duration_min),
-      notes: f.notes || null,
-    };
-    const { error } = editingId
-      ? await supabase.from("workout_logs").update(payload).eq("id", editingId)
-      : await supabase.from("workout_logs").insert({ user_id: user.id, ...payload });
-    if (error) toast.error(error.message);
-    else {
-      toast.success(editingId ? "Đã cập nhật bài tập" : "Đã ghi bài tập");
-      setF({ exercise: "", workout_type: "", sets: "", reps: "", weight_kg: "", duration_min: "", notes: "" });
-      setEditingId(null);
+    try {
+      await create({
+        data: {
+          performedAt: f.performedAt,
+          dayLabel: f.dayLabel || null,
+          muscleGroup: f.muscleGroup || null,
+          exercise: f.exercise.trim(),
+          sets: num(f.sets) as number | null,
+          reps: f.reps || null,
+          weightKg: num(f.weightKg),
+          notes: f.notes || null,
+        },
+      });
+      toast.success("Đã log bài tập");
+      setF({ ...f, exercise: "", sets: "", reps: "", weightKg: "", notes: "" });
       load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi");
     }
-  };
-
-  const startEdit = (r: Row) => {
-    setEditingId(r.id);
-    setF({
-      exercise: r.exercise,
-      workout_type: r.workout_type ?? "",
-      sets: r.sets?.toString() ?? "",
-      reps: r.reps?.toString() ?? "",
-      weight_kg: r.weight_kg?.toString() ?? "",
-      duration_min: r.duration_min?.toString() ?? "",
-      notes: r.notes ?? "",
-    });
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setF({ exercise: "", workout_type: "", sets: "", reps: "", weight_kg: "", duration_min: "", notes: "" });
-  };
-
-  const remove = async (id: string) => {
-    if (!confirm("Xoá bài tập này?")) return;
-    const { error } = await supabase.from("workout_logs").delete().eq("id", id);
-    if (error) toast.error(error.message);
-    else { toast.success("Đã xoá"); if (editingId === id) cancelEdit(); load(); }
-  };
-
-  const exportCSV = () => {
-    if (rows.length === 0) { toast.error("Chưa có dữ liệu"); return; }
-    const header = ["Ngày giờ", "Bài tập", "Sets", "Reps", "Tạ (kg)", "Ghi chú"];
-    const esc = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const lines = [header.join(",")].concat(
-      rows.map((r) => [formatDateTime(r.performed_at), r.exercise, r.sets ?? "", r.reps ?? "", r.weight_kg ?? "", r.notes ?? ""].map(esc).join(",")),
-    );
-    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `workout-history-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Đã xuất CSV");
-  };
-
-  const exportPDF = () => {
-    if (rows.length === 0) { toast.error("Chưa có dữ liệu"); return; }
-    const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) { toast.error("Trình duyệt chặn cửa sổ in"); return; }
-    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-    const rowsHtml = rows.map((r) => `
-      <tr>
-        <td>${esc(formatDateTime(r.performed_at))}</td>
-        <td>${esc(r.exercise)}</td>
-        <td style="text-align:center">${r.sets ?? ""}</td>
-        <td style="text-align:center">${r.reps ?? ""}</td>
-        <td style="text-align:center">${r.weight_kg ?? ""}</td>
-        <td>${esc(r.notes ?? "")}</td>
-      </tr>`).join("");
-    w.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Lịch sử tập luyện</title>
-      <style>
-        body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111;padding:24px}
-        h1{font-size:18px;margin:0 0 4px}
-        .sub{color:#666;font-size:12px;margin-bottom:16px}
-        table{width:100%;border-collapse:collapse;font-size:12px}
-        th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
-        th{background:#f5f5f5}
-        @media print{ button{display:none} }
-      </style></head><body>
-      <h1>HL Fitness — Lịch sử tập luyện</h1>
-      <div class="sub">${esc(user?.email ?? "")} • Xuất ngày ${esc(new Date().toLocaleString("vi-VN"))} • ${rows.length} bài tập</div>
-      <table><thead><tr><th>Ngày giờ</th><th>Bài tập</th><th>Sets</th><th>Reps</th><th>Tạ (kg)</th><th>Ghi chú</th></tr></thead>
-      <tbody>${rowsHtml}</tbody></table>
-      <button onclick="window.print()" style="margin-top:16px;padding:8px 16px">In / Lưu PDF</button>
-      <script>setTimeout(()=>window.print(),300)</script>
-      </body></html>`);
-    w.document.close();
   };
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6">
-      <PageHeader title="Nhật ký tập luyện" subtitle="Ghi lại bài tập của bạn" />
-      <div className="flex gap-2 mb-4">
-        <Button type="button" variant="outline" size="sm" onClick={exportCSV}>
-          <Download className="size-4 mr-1.5" /> Xuất CSV
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={exportPDF}>
-          <FileText className="size-4 mr-1.5" /> Xuất PDF
-        </Button>
-      </div>
+      <PageHeader title="Nhật ký tập" subtitle="Ghi lại từng bài tập đã hoàn thành" />
       <form onSubmit={submit} className="rounded-xl border border-border bg-card p-4 mb-6 space-y-3">
         <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><Label>Ngày</Label>
+            <Input type="date" value={f.performedAt} onChange={(e) => setF({ ...f, performedAt: e.target.value })} required /></div>
+          <div className="space-y-1"><Label>Buổi tập</Label>
+            <Input value={f.dayLabel} onChange={(e) => setF({ ...f, dayLabel: e.target.value })} placeholder="Day 1, Push, ..." /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><Label>Nhóm cơ</Label>
+            <Input value={f.muscleGroup} onChange={(e) => setF({ ...f, muscleGroup: e.target.value })} placeholder="Chest, Back..." /></div>
           <div className="space-y-1"><Label>Bài tập</Label>
-            <Input value={f.exercise} onChange={(e) => setF({ ...f, exercise: e.target.value })} placeholder="VD: Bench Press" required maxLength={100} /></div>
-          <div className="space-y-1"><Label>Loại buổi tập</Label>
-            <Input value={f.workout_type} onChange={(e) => setF({ ...f, workout_type: e.target.value })} placeholder="Push / Pull / Legs / Cardio" maxLength={40} /></div>
+            <Input value={f.exercise} onChange={(e) => setF({ ...f, exercise: e.target.value })} placeholder="Bench Press" required /></div>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1"><Label>Sets</Label><Input type="number" value={f.sets} onChange={(e) => setF({ ...f, sets: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Reps</Label><Input type="number" value={f.reps} onChange={(e) => setF({ ...f, reps: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Tạ (kg)</Label><Input type="number" step="0.5" value={f.weight_kg} onChange={(e) => setF({ ...f, weight_kg: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Reps</Label><Input value={f.reps} onChange={(e) => setF({ ...f, reps: e.target.value })} placeholder="8-12" /></div>
+          <div className="space-y-1"><Label>Tạ (kg)</Label><Input type="number" step="0.5" value={f.weightKg} onChange={(e) => setF({ ...f, weightKg: e.target.value })} /></div>
         </div>
-        <div className="space-y-1"><Label>Thời lượng (phút)</Label>
-          <Input type="number" value={f.duration_min} onChange={(e) => setF({ ...f, duration_min: e.target.value })} placeholder="VD: 45" /></div>
         <div className="space-y-1"><Label>Ghi chú</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
-        <div className="flex gap-2">
-          <Button type="submit">{editingId ? "Lưu thay đổi" : "Thêm bài tập"}</Button>
-          {editingId && (
-            <Button type="button" variant="ghost" onClick={cancelEdit}>
-              <X className="size-4 mr-1" /> Huỷ
-            </Button>
-          )}
-        </div>
+        <Button type="submit">Lưu</Button>
       </form>
+
       <div className="space-y-2">
         {rows.length === 0 && <div className="text-sm text-muted-foreground text-center py-8">Chưa có bài tập nào.</div>}
         {rows.map((r) => (
-          <div key={r.id} className={cn("rounded-lg border bg-card p-3 flex items-center justify-between", editingId === r.id ? "border-primary" : "border-border")}>
-            <div className="min-w-0">
-              <div className="font-medium text-sm">{r.exercise}</div>
-              <div className="text-xs text-muted-foreground">
-                {formatDateTime(r.performed_at)}
-                {r.workout_type ? ` • ${r.workout_type}` : ""}
-                {r.sets && r.reps ? ` • ${r.sets}×${r.reps}` : ""}
-                {r.weight_kg ? ` • ${r.weight_kg}kg` : ""}
-                {r.duration_min ? ` • ${r.duration_min} phút` : ""}
-              </div>
-              {r.notes && <div className="text-xs mt-1">{r.notes}</div>}
+          <div key={r.id} className="rounded-lg border border-border bg-card p-3">
+            <div className="font-medium text-sm">{r.exercise}</div>
+            <div className="text-xs text-muted-foreground">
+              {formatDate(r.performedAt)}
+              {r.muscleGroup ? ` • ${r.muscleGroup}` : ""}
+              {r.sets && r.reps ? ` • ${r.sets}×${r.reps}` : ""}
+              {r.weightKg ? ` • ${r.weightKg}kg` : ""}
             </div>
-            <div className="flex gap-1 shrink-0">
-              <Button variant="ghost" size="icon" onClick={() => startEdit(r)} aria-label="Sửa">
-                <Pencil className="size-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => remove(r.id)} aria-label="Xoá">
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
+            {r.notes && <div className="text-xs mt-1 italic">{r.notes}</div>}
           </div>
         ))}
       </div>
