@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as AuthenticatedTrainerRouteImport } from './routes/_authenticated/trainer'
 import { Route as AuthenticatedProgressReportRouteImport } from './routes/_authenticated/progress-report'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
@@ -32,6 +34,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedTrainerRoute = AuthenticatedTrainerRouteImport.update({
+  id: '/trainer',
+  path: '/trainer',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProgressReportRoute =
   AuthenticatedProgressReportRouteImport.update({
@@ -73,6 +85,8 @@ export interface FileRoutesByFullPath {
   '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress-report': typeof AuthenticatedProgressReportRoute
+  '/trainer': typeof AuthenticatedTrainerRoute
+  '/api/chat': typeof ApiChatRoute
   '/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
@@ -83,6 +97,8 @@ export interface FileRoutesByTo {
   '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress-report': typeof AuthenticatedProgressReportRoute
+  '/trainer': typeof AuthenticatedTrainerRoute
+  '/api/chat': typeof ApiChatRoute
   '/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
@@ -95,6 +111,8 @@ export interface FileRoutesById {
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/progress-report': typeof AuthenticatedProgressReportRoute
+  '/_authenticated/trainer': typeof AuthenticatedTrainerRoute
+  '/api/chat': typeof ApiChatRoute
   '/_authenticated/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/_authenticated/log/workout': typeof AuthenticatedLogWorkoutRoute
 }
@@ -107,6 +125,8 @@ export interface FileRouteTypes {
     | '/plans'
     | '/profile'
     | '/progress-report'
+    | '/trainer'
+    | '/api/chat'
     | '/log/nutrition-report'
     | '/log/workout'
   fileRoutesByTo: FileRoutesByTo
@@ -117,6 +137,8 @@ export interface FileRouteTypes {
     | '/plans'
     | '/profile'
     | '/progress-report'
+    | '/trainer'
+    | '/api/chat'
     | '/log/nutrition-report'
     | '/log/workout'
   id:
@@ -128,6 +150,8 @@ export interface FileRouteTypes {
     | '/_authenticated/plans'
     | '/_authenticated/profile'
     | '/_authenticated/progress-report'
+    | '/_authenticated/trainer'
+    | '/api/chat'
     | '/_authenticated/log/nutrition-report'
     | '/_authenticated/log/workout'
   fileRoutesById: FileRoutesById
@@ -136,6 +160,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiChatRoute: typeof ApiChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -160,6 +185,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/trainer': {
+      id: '/_authenticated/trainer'
+      path: '/trainer'
+      fullPath: '/trainer'
+      preLoaderRoute: typeof AuthenticatedTrainerRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/progress-report': {
       id: '/_authenticated/progress-report'
@@ -211,6 +250,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedProgressReportRoute: typeof AuthenticatedProgressReportRoute
+  AuthenticatedTrainerRoute: typeof AuthenticatedTrainerRoute
   AuthenticatedLogNutritionReportRoute: typeof AuthenticatedLogNutritionReportRoute
   AuthenticatedLogWorkoutRoute: typeof AuthenticatedLogWorkoutRoute
 }
@@ -220,6 +260,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedProgressReportRoute: AuthenticatedProgressReportRoute,
+  AuthenticatedTrainerRoute: AuthenticatedTrainerRoute,
   AuthenticatedLogNutritionReportRoute: AuthenticatedLogNutritionReportRoute,
   AuthenticatedLogWorkoutRoute: AuthenticatedLogWorkoutRoute,
 }
@@ -232,7 +273,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiChatRoute: ApiChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
