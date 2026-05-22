@@ -1,4 +1,5 @@
 import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
+import logDevError from '@/lib/error-logger';
 import { sha256 } from "@oslojs/crypto/sha2";
 import { encodeBase32LowerCaseNoPadding, encodeHexLowerCase } from "@oslojs/encoding";
 import { eq } from "drizzle-orm";
@@ -38,8 +39,13 @@ export function createSession(userId: string): { token: string; expiresAt: numbe
   const token = generateSessionToken();
   const sessionId = hashSessionToken(token);
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  db.insert(schema.sessions).values({ id: sessionId, userId, expiresAt }).run();
-  return { token, expiresAt };
+  try {
+    db.insert(schema.sessions).values({ id: sessionId, userId, expiresAt }).run();
+    return { token, expiresAt };
+  } catch (err: any) {
+    logDevError({ error: err, req: null }).catch(() => {});
+    throw new Error('Failed to create session');
+  }
 }
 
 export function validateSessionToken(token: string) {

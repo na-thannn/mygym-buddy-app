@@ -1,8 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
-import { db, schema } from "@/server/db";
-import { requireAuth, newId } from "@/server/auth";
+
+async function requireSession() {
+  const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
+  const token = readSessionCookie();
+  if (!token) throw new Response("Unauthorized", { status: 401 });
+  const session = validateSessionToken(token);
+  if (!session) throw new Response("Unauthorized", { status: 401 });
+  return session;
+}
 
 const logInput = z.object({
   performedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -16,21 +23,24 @@ const logInput = z.object({
 });
 
 export const logWorkoutEntry = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
   .inputValidator((d: unknown) => logInput.parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
+    const { newId } = await import("@/server/auth");
     const id = newId();
-    db.insert(schema.workoutLogs).values({ id, userId: context.userId, ...data }).run();
+    db.insert(schema.workoutLogs).values({ id, userId: session.userId, ...data }).run();
     return { ok: true, id };
   });
 
 export const listRecentWorkouts = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
   .inputValidator((d: unknown) =>
     z.object({ fromDate: z.string().optional(), toDate: z.string().optional(), limit: z.number().int().min(1).max(200).default(50) }).parse(d ?? {}),
   )
-  .handler(async ({ data, context }) => {
-    const where = [eq(schema.workoutLogs.userId, context.userId)];
+  .handler(async ({ data }) => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
+    const where = [eq(schema.workoutLogs.userId, session.userId)];
     if (data.fromDate) where.push(gte(schema.workoutLogs.performedAt, data.fromDate));
     if (data.toDate) where.push(lte(schema.workoutLogs.performedAt, data.toDate));
     return db

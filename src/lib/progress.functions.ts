@@ -1,8 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
-import { db, schema } from "@/server/db";
-import { requireAuth, newId } from "@/server/auth";
+
+async function requireSession() {
+  const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
+  const token = readSessionCookie();
+  if (!token) throw new Response("Unauthorized", { status: 401 });
+  const session = validateSessionToken(token);
+  if (!session) throw new Response("Unauthorized", { status: 401 });
+  return session;
+}
 
 const reportInput = z.object({
   reportDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -13,21 +20,29 @@ const reportInput = z.object({
 });
 
 export const saveProgressReport = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
   .inputValidator((d: unknown) => reportInput.parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
+    const { newId } = await import("@/server/auth");
     const id = newId();
-    db.insert(schema.progressReports).values({ id, userId: context.userId, ...data }).run();
-    return { ok: true, id };
+    try {
+      db.insert(schema.progressReports).values({ id, userId: session.userId, ...data }).run();
+      return { ok: true, id };
+    } catch (err: any) {
+      await logDevError({ error: err, req: null }).catch(() => {});
+      throw new Response('Server error', { status: 500 });
+    }
   });
 
 export const listProgressReports = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
     return db
       .select()
       .from(schema.progressReports)
-      .where(eq(schema.progressReports.userId, context.userId))
+      .where(eq(schema.progressReports.userId, session.userId))
       .orderBy(desc(schema.progressReports.reportDate))
       .limit(50)
       .all();

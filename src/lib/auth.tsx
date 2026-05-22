@@ -1,6 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { getCurrentUser, signOut as signOutFn } from "@/lib/auth.functions";
 
 export type AppUser = { id: string; email: string; displayName: string };
 
@@ -16,19 +14,21 @@ const Ctx = createContext<AuthCtx | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const getMe = useServerFn(getCurrentUser);
-  const doSignOut = useServerFn(signOutFn);
-
   const refresh = useCallback(async () => {
     try {
-      const u = await getMe();
-      setUser(u as AppUser | null);
+      const res = await fetch("/api/current-user", { credentials: "include" });
+      if (res.ok) {
+        const u = await res.json();
+        setUser(u as AppUser | null);
+      } else {
+        setUser(null);
+      }
     } catch {
       setUser(null);
     } finally {
       setLoading(false);
     }
-  }, [getMe]);
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -41,8 +41,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         refresh,
         signOut: async () => {
-          await doSignOut();
-          setUser(null);
+          try {
+            await fetch("/api/signout", { method: "POST", credentials: "include" });
+          } finally {
+            setUser(null);
+          }
         },
       }}
     >

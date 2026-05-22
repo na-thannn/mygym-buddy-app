@@ -9,18 +9,42 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as GetStartedRouteImport } from './routes/get-started'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSignupRouteImport } from './routes/api/signup'
+import { Route as ApiSignoutRouteImport } from './routes/api/signout'
+import { Route as ApiSigninRouteImport } from './routes/api/signin'
+import { Route as ApiProgressReportRouteImport } from './routes/api/progress-report'
+import { Route as ApiProgressPhotosRouteImport } from './routes/api/progress-photos'
+import { Route as ApiProfileRouteImport } from './routes/api/profile'
+import { Route as ApiPlansRouteImport } from './routes/api/plans'
+import { Route as ApiInbodyRouteImport } from './routes/api/inbody'
+import { Route as ApiFeedRouteImport } from './routes/api/feed'
+import { Route as ApiDebugEchoRouteImport } from './routes/api/debug-echo'
+import { Route as ApiCurrentUserRouteImport } from './routes/api/current-user'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiAnalysesRouteImport } from './routes/api/analyses'
 import { Route as AuthenticatedTrainerRouteImport } from './routes/_authenticated/trainer'
 import { Route as AuthenticatedProgressReportRouteImport } from './routes/_authenticated/progress-report'
+import { Route as AuthenticatedProgressRouteImport } from './routes/_authenticated/progress'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
+import { Route as AuthenticatedNutritionRouteImport } from './routes/_authenticated/nutrition'
+import { Route as AuthenticatedInbodyRouteImport } from './routes/_authenticated/inbody'
+import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedAnalysesRouteImport } from './routes/_authenticated/analyses'
+import { Route as ApiLogWorkoutRouteImport } from './routes/api/log/workout'
+import { Route as ApiLogNutritionReportRouteImport } from './routes/api/log/nutrition-report'
 import { Route as AuthenticatedLogWorkoutRouteImport } from './routes/_authenticated/log.workout'
 import { Route as AuthenticatedLogNutritionReportRouteImport } from './routes/_authenticated/log.nutrition-report'
 
+const GetStartedRoute = GetStartedRouteImport.update({
+  id: '/get-started',
+  path: '/get-started',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -35,9 +59,69 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSignupRoute = ApiSignupRouteImport.update({
+  id: '/api/signup',
+  path: '/api/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSignoutRoute = ApiSignoutRouteImport.update({
+  id: '/api/signout',
+  path: '/api/signout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSigninRoute = ApiSigninRouteImport.update({
+  id: '/api/signin',
+  path: '/api/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProgressReportRoute = ApiProgressReportRouteImport.update({
+  id: '/api/progress-report',
+  path: '/api/progress-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProgressPhotosRoute = ApiProgressPhotosRouteImport.update({
+  id: '/api/progress-photos',
+  path: '/api/progress-photos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileRoute = ApiProfileRouteImport.update({
+  id: '/api/profile',
+  path: '/api/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlansRoute = ApiPlansRouteImport.update({
+  id: '/api/plans',
+  path: '/api/plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInbodyRoute = ApiInbodyRouteImport.update({
+  id: '/api/inbody',
+  path: '/api/inbody',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFeedRoute = ApiFeedRouteImport.update({
+  id: '/api/feed',
+  path: '/api/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDebugEchoRoute = ApiDebugEchoRouteImport.update({
+  id: '/api/debug-echo',
+  path: '/api/debug-echo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCurrentUserRoute = ApiCurrentUserRouteImport.update({
+  id: '/api/current-user',
+  path: '/api/current-user',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnalysesRoute = ApiAnalysesRouteImport.update({
+  id: '/api/analyses',
+  path: '/api/analyses',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedTrainerRoute = AuthenticatedTrainerRouteImport.update({
@@ -51,6 +135,11 @@ const AuthenticatedProgressReportRoute =
     path: '/progress-report',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedProgressRoute = AuthenticatedProgressRouteImport.update({
+  id: '/progress',
+  path: '/progress',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -61,10 +150,35 @@ const AuthenticatedPlansRoute = AuthenticatedPlansRouteImport.update({
   path: '/plans',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedNutritionRoute = AuthenticatedNutritionRouteImport.update({
+  id: '/nutrition',
+  path: '/nutrition',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedInbodyRoute = AuthenticatedInbodyRouteImport.update({
+  id: '/inbody',
+  path: '/inbody',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAnalysesRoute = AuthenticatedAnalysesRouteImport.update({
   id: '/analyses',
   path: '/analyses',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiLogWorkoutRoute = ApiLogWorkoutRouteImport.update({
+  id: '/api/log/workout',
+  path: '/api/log/workout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLogNutritionReportRoute = ApiLogNutritionReportRouteImport.update({
+  id: '/api/log/nutrition-report',
+  path: '/api/log/nutrition-report',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedLogWorkoutRoute = AuthenticatedLogWorkoutRouteImport.update({
   id: '/log/workout',
@@ -81,90 +195,226 @@ const AuthenticatedLogNutritionReportRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/get-started': typeof GetStartedRoute
   '/analyses': typeof AuthenticatedAnalysesRoute
+  '/feed': typeof AuthenticatedFeedRoute
+  '/inbody': typeof AuthenticatedInbodyRoute
+  '/nutrition': typeof AuthenticatedNutritionRoute
   '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/progress': typeof AuthenticatedProgressRoute
   '/progress-report': typeof AuthenticatedProgressReportRoute
   '/trainer': typeof AuthenticatedTrainerRoute
+  '/api/analyses': typeof ApiAnalysesRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/current-user': typeof ApiCurrentUserRoute
+  '/api/debug-echo': typeof ApiDebugEchoRoute
+  '/api/feed': typeof ApiFeedRoute
+  '/api/inbody': typeof ApiInbodyRoute
+  '/api/plans': typeof ApiPlansRoute
+  '/api/profile': typeof ApiProfileRoute
+  '/api/progress-photos': typeof ApiProgressPhotosRoute
+  '/api/progress-report': typeof ApiProgressReportRoute
+  '/api/signin': typeof ApiSigninRoute
+  '/api/signout': typeof ApiSignoutRoute
+  '/api/signup': typeof ApiSignupRoute
   '/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
+  '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
+  '/api/log/workout': typeof ApiLogWorkoutRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/get-started': typeof GetStartedRoute
   '/analyses': typeof AuthenticatedAnalysesRoute
+  '/feed': typeof AuthenticatedFeedRoute
+  '/inbody': typeof AuthenticatedInbodyRoute
+  '/nutrition': typeof AuthenticatedNutritionRoute
   '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/progress': typeof AuthenticatedProgressRoute
   '/progress-report': typeof AuthenticatedProgressReportRoute
   '/trainer': typeof AuthenticatedTrainerRoute
+  '/api/analyses': typeof ApiAnalysesRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/current-user': typeof ApiCurrentUserRoute
+  '/api/debug-echo': typeof ApiDebugEchoRoute
+  '/api/feed': typeof ApiFeedRoute
+  '/api/inbody': typeof ApiInbodyRoute
+  '/api/plans': typeof ApiPlansRoute
+  '/api/profile': typeof ApiProfileRoute
+  '/api/progress-photos': typeof ApiProgressPhotosRoute
+  '/api/progress-report': typeof ApiProgressReportRoute
+  '/api/signin': typeof ApiSigninRoute
+  '/api/signout': typeof ApiSignoutRoute
+  '/api/signup': typeof ApiSignupRoute
   '/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
+  '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
+  '/api/log/workout': typeof ApiLogWorkoutRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
+  '/get-started': typeof GetStartedRoute
   '/_authenticated/analyses': typeof AuthenticatedAnalysesRoute
+  '/_authenticated/feed': typeof AuthenticatedFeedRoute
+  '/_authenticated/inbody': typeof AuthenticatedInbodyRoute
+  '/_authenticated/nutrition': typeof AuthenticatedNutritionRoute
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/progress': typeof AuthenticatedProgressRoute
   '/_authenticated/progress-report': typeof AuthenticatedProgressReportRoute
   '/_authenticated/trainer': typeof AuthenticatedTrainerRoute
+  '/api/analyses': typeof ApiAnalysesRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/current-user': typeof ApiCurrentUserRoute
+  '/api/debug-echo': typeof ApiDebugEchoRoute
+  '/api/feed': typeof ApiFeedRoute
+  '/api/inbody': typeof ApiInbodyRoute
+  '/api/plans': typeof ApiPlansRoute
+  '/api/profile': typeof ApiProfileRoute
+  '/api/progress-photos': typeof ApiProgressPhotosRoute
+  '/api/progress-report': typeof ApiProgressReportRoute
+  '/api/signin': typeof ApiSigninRoute
+  '/api/signout': typeof ApiSignoutRoute
+  '/api/signup': typeof ApiSignupRoute
   '/_authenticated/log/nutrition-report': typeof AuthenticatedLogNutritionReportRoute
   '/_authenticated/log/workout': typeof AuthenticatedLogWorkoutRoute
+  '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
+  '/api/log/workout': typeof ApiLogWorkoutRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/auth'
+    | '/get-started'
     | '/analyses'
+    | '/feed'
+    | '/inbody'
+    | '/nutrition'
     | '/plans'
     | '/profile'
+    | '/progress'
     | '/progress-report'
     | '/trainer'
+    | '/api/analyses'
     | '/api/chat'
+    | '/api/current-user'
+    | '/api/debug-echo'
+    | '/api/feed'
+    | '/api/inbody'
+    | '/api/plans'
+    | '/api/profile'
+    | '/api/progress-photos'
+    | '/api/progress-report'
+    | '/api/signin'
+    | '/api/signout'
+    | '/api/signup'
     | '/log/nutrition-report'
     | '/log/workout'
+    | '/api/log/nutrition-report'
+    | '/api/log/workout'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/get-started'
     | '/analyses'
+    | '/feed'
+    | '/inbody'
+    | '/nutrition'
     | '/plans'
     | '/profile'
+    | '/progress'
     | '/progress-report'
     | '/trainer'
+    | '/api/analyses'
     | '/api/chat'
+    | '/api/current-user'
+    | '/api/debug-echo'
+    | '/api/feed'
+    | '/api/inbody'
+    | '/api/plans'
+    | '/api/profile'
+    | '/api/progress-photos'
+    | '/api/progress-report'
+    | '/api/signin'
+    | '/api/signout'
+    | '/api/signup'
     | '/log/nutrition-report'
     | '/log/workout'
+    | '/api/log/nutrition-report'
+    | '/api/log/workout'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/get-started'
     | '/_authenticated/analyses'
+    | '/_authenticated/feed'
+    | '/_authenticated/inbody'
+    | '/_authenticated/nutrition'
     | '/_authenticated/plans'
     | '/_authenticated/profile'
+    | '/_authenticated/progress'
     | '/_authenticated/progress-report'
     | '/_authenticated/trainer'
+    | '/api/analyses'
     | '/api/chat'
+    | '/api/current-user'
+    | '/api/debug-echo'
+    | '/api/feed'
+    | '/api/inbody'
+    | '/api/plans'
+    | '/api/profile'
+    | '/api/progress-photos'
+    | '/api/progress-report'
+    | '/api/signin'
+    | '/api/signout'
+    | '/api/signup'
     | '/_authenticated/log/nutrition-report'
     | '/_authenticated/log/workout'
+    | '/api/log/nutrition-report'
+    | '/api/log/workout'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  GetStartedRoute: typeof GetStartedRoute
+  ApiAnalysesRoute: typeof ApiAnalysesRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiCurrentUserRoute: typeof ApiCurrentUserRoute
+  ApiDebugEchoRoute: typeof ApiDebugEchoRoute
+  ApiFeedRoute: typeof ApiFeedRoute
+  ApiInbodyRoute: typeof ApiInbodyRoute
+  ApiPlansRoute: typeof ApiPlansRoute
+  ApiProfileRoute: typeof ApiProfileRoute
+  ApiProgressPhotosRoute: typeof ApiProgressPhotosRoute
+  ApiProgressReportRoute: typeof ApiProgressReportRoute
+  ApiSigninRoute: typeof ApiSigninRoute
+  ApiSignoutRoute: typeof ApiSignoutRoute
+  ApiSignupRoute: typeof ApiSignupRoute
+  ApiLogNutritionReportRoute: typeof ApiLogNutritionReportRoute
+  ApiLogWorkoutRoute: typeof ApiLogWorkoutRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/get-started': {
+      id: '/get-started'
+      path: '/get-started'
+      fullPath: '/get-started'
+      preLoaderRoute: typeof GetStartedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -186,11 +436,95 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/signup': {
+      id: '/api/signup'
+      path: '/api/signup'
+      fullPath: '/api/signup'
+      preLoaderRoute: typeof ApiSignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/signout': {
+      id: '/api/signout'
+      path: '/api/signout'
+      fullPath: '/api/signout'
+      preLoaderRoute: typeof ApiSignoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/signin': {
+      id: '/api/signin'
+      path: '/api/signin'
+      fullPath: '/api/signin'
+      preLoaderRoute: typeof ApiSigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/progress-report': {
+      id: '/api/progress-report'
+      path: '/api/progress-report'
+      fullPath: '/api/progress-report'
+      preLoaderRoute: typeof ApiProgressReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/progress-photos': {
+      id: '/api/progress-photos'
+      path: '/api/progress-photos'
+      fullPath: '/api/progress-photos'
+      preLoaderRoute: typeof ApiProgressPhotosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile': {
+      id: '/api/profile'
+      path: '/api/profile'
+      fullPath: '/api/profile'
+      preLoaderRoute: typeof ApiProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/plans': {
+      id: '/api/plans'
+      path: '/api/plans'
+      fullPath: '/api/plans'
+      preLoaderRoute: typeof ApiPlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/inbody': {
+      id: '/api/inbody'
+      path: '/api/inbody'
+      fullPath: '/api/inbody'
+      preLoaderRoute: typeof ApiInbodyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/feed': {
+      id: '/api/feed'
+      path: '/api/feed'
+      fullPath: '/api/feed'
+      preLoaderRoute: typeof ApiFeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/debug-echo': {
+      id: '/api/debug-echo'
+      path: '/api/debug-echo'
+      fullPath: '/api/debug-echo'
+      preLoaderRoute: typeof ApiDebugEchoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/current-user': {
+      id: '/api/current-user'
+      path: '/api/current-user'
+      fullPath: '/api/current-user'
+      preLoaderRoute: typeof ApiCurrentUserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/analyses': {
+      id: '/api/analyses'
+      path: '/api/analyses'
+      fullPath: '/api/analyses'
+      preLoaderRoute: typeof ApiAnalysesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/trainer': {
@@ -207,6 +541,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProgressReportRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/progress': {
+      id: '/_authenticated/progress'
+      path: '/progress'
+      fullPath: '/progress'
+      preLoaderRoute: typeof AuthenticatedProgressRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
@@ -221,12 +562,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPlansRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/nutrition': {
+      id: '/_authenticated/nutrition'
+      path: '/nutrition'
+      fullPath: '/nutrition'
+      preLoaderRoute: typeof AuthenticatedNutritionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/inbody': {
+      id: '/_authenticated/inbody'
+      path: '/inbody'
+      fullPath: '/inbody'
+      preLoaderRoute: typeof AuthenticatedInbodyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/feed': {
+      id: '/_authenticated/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof AuthenticatedFeedRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/analyses': {
       id: '/_authenticated/analyses'
       path: '/analyses'
       fullPath: '/analyses'
       preLoaderRoute: typeof AuthenticatedAnalysesRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/log/workout': {
+      id: '/api/log/workout'
+      path: '/api/log/workout'
+      fullPath: '/api/log/workout'
+      preLoaderRoute: typeof ApiLogWorkoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/log/nutrition-report': {
+      id: '/api/log/nutrition-report'
+      path: '/api/log/nutrition-report'
+      fullPath: '/api/log/nutrition-report'
+      preLoaderRoute: typeof ApiLogNutritionReportRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/log/workout': {
       id: '/_authenticated/log/workout'
@@ -247,8 +623,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAnalysesRoute: typeof AuthenticatedAnalysesRoute
+  AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
+  AuthenticatedInbodyRoute: typeof AuthenticatedInbodyRoute
+  AuthenticatedNutritionRoute: typeof AuthenticatedNutritionRoute
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedProgressRoute: typeof AuthenticatedProgressRoute
   AuthenticatedProgressReportRoute: typeof AuthenticatedProgressReportRoute
   AuthenticatedTrainerRoute: typeof AuthenticatedTrainerRoute
   AuthenticatedLogNutritionReportRoute: typeof AuthenticatedLogNutritionReportRoute
@@ -257,8 +637,12 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnalysesRoute: AuthenticatedAnalysesRoute,
+  AuthenticatedFeedRoute: AuthenticatedFeedRoute,
+  AuthenticatedInbodyRoute: AuthenticatedInbodyRoute,
+  AuthenticatedNutritionRoute: AuthenticatedNutritionRoute,
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedProgressRoute: AuthenticatedProgressRoute,
   AuthenticatedProgressReportRoute: AuthenticatedProgressReportRoute,
   AuthenticatedTrainerRoute: AuthenticatedTrainerRoute,
   AuthenticatedLogNutritionReportRoute: AuthenticatedLogNutritionReportRoute,
@@ -273,7 +657,22 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  GetStartedRoute: GetStartedRoute,
+  ApiAnalysesRoute: ApiAnalysesRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiCurrentUserRoute: ApiCurrentUserRoute,
+  ApiDebugEchoRoute: ApiDebugEchoRoute,
+  ApiFeedRoute: ApiFeedRoute,
+  ApiInbodyRoute: ApiInbodyRoute,
+  ApiPlansRoute: ApiPlansRoute,
+  ApiProfileRoute: ApiProfileRoute,
+  ApiProgressPhotosRoute: ApiProgressPhotosRoute,
+  ApiProgressReportRoute: ApiProgressReportRoute,
+  ApiSigninRoute: ApiSigninRoute,
+  ApiSignoutRoute: ApiSignoutRoute,
+  ApiSignupRoute: ApiSignupRoute,
+  ApiLogNutritionReportRoute: ApiLogNutritionReportRoute,
+  ApiLogWorkoutRoute: ApiLogWorkoutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

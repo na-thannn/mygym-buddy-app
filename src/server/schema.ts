@@ -105,3 +105,29 @@ export const chatMessages = sqliteTable("chat_messages", {
   contentJson: text("content_json").notNull(),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const inbodyReports = sqliteTable("inbody_reports", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reportDate: text("report_date").notNull(),
+  weightKg: real("weight_kg").notNull(),
+  muscleMassKg: real("muscle_mass_kg").notNull(),
+  bodyFatPercent: real("body_fat_percent").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const communityFeed = sqliteTable("community_feed", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  imageBase64: text("image_base64"),
+  likesCount: integer("likes_count").notNull().default(0),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const progressPhotos = sqliteTable("progress_photos", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  imageBase64: text("image_base64").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

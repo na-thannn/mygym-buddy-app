@@ -1,16 +1,25 @@
 import { createServerFn } from "@tanstack/react-start";
+import logDevError from '@/lib/error-logger';
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { db, schema } from "@/server/db";
-import { requireAuth } from "@/server/auth";
+
+async function requireSession() {
+  const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
+  const token = readSessionCookie();
+  if (!token) throw new Response("Unauthorized", { status: 401 });
+  const session = validateSessionToken(token);
+  if (!session) throw new Response("Unauthorized", { status: 401 });
+  return session;
+}
 
 export const getProfile = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
     const row = db
       .select()
       .from(schema.profiles)
-      .where(eq(schema.profiles.userId, context.userId))
+      .where(eq(schema.profiles.userId, session.userId))
       .get();
     return row ?? null;
   });
@@ -27,19 +36,26 @@ const saveProfileInput = z.object({
 });
 
 export const saveProfile = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
   .inputValidator((d: unknown) => saveProfileInput.parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
     const existing = db
       .select({ userId: schema.profiles.userId })
       .from(schema.profiles)
-      .where(eq(schema.profiles.userId, context.userId))
+      .where(eq(schema.profiles.userId, session.userId))
       .get();
     const patch = { ...data, updatedAt: new Date().toISOString() };
     if (existing) {
-      db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, context.userId)).run();
+      db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, session.userId)).run();
     } else {
-      db.insert(schema.profiles).values({ userId: context.userId, ...patch }).run();
+        try {
+          db.insert(schema.profiles).values({ userId: session.userId, ...patch }).run();
+          return { ok: true };
+        } catch (err: any) {
+          await logDevError({ error: err, req: null }).catch(() => {});
+          throw new Response('Server error', { status: 500 });
+        }
     }
     return { ok: true };
   });

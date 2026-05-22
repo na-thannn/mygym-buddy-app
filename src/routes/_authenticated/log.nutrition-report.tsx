@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { listNutritionReports, saveNutritionReport } from "@/lib/nutrition.functions";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/log/nutrition-report")({
-  head: () => ({ meta: [{ title: "Báo cáo dinh dưỡng — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Nutrition Report — HL Fitness" }] }),
   component: NutritionReport,
 });
 
@@ -33,8 +32,16 @@ const empty = {
 };
 
 function NutritionReport() {
-  const list = useServerFn(listNutritionReports);
-  const save = useServerFn(saveNutritionReport);
+  const list = async () => {
+    const res = await fetch('/api/log/nutrition-report', { credentials: 'include' });
+    if (!res.ok) return [];
+    return res.json();
+  };
+
+  const save = async (payload: { data: any }) => {
+    const res = await fetch('/api/log/nutrition-report', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload.data) });
+    return res.json();
+  };
   const [rows, setRows] = useState<Row[]>([]);
   const [f, setF] = useState(empty);
   const [busy, setBusy] = useState(false);
@@ -60,11 +67,11 @@ function NutritionReport() {
           estimateMacros: true,
         },
       });
-      toast.success(r.macros ? `Đã lưu — ~${r.macros.calories} kcal` : "Đã lưu báo cáo");
+      toast.success(r.macros ? `Saved — ~${r.macros.calories} kcal` : "Report saved");
       setF(empty);
       load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Lỗi");
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setBusy(false);
     }
@@ -72,12 +79,12 @@ function NutritionReport() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6">
-      <PageHeader title="Báo cáo dinh dưỡng" subtitle="Lưu báo cáo — Alex tự ước tính macros bằng AI" />
-      <form onSubmit={submit} className="rounded-xl border border-border bg-card p-4 mb-6 space-y-3">
+      <PageHeader title="Nutrition Report" subtitle="Log your day and let Alex estimate macros." />
+      <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-4 mb-6 space-y-3 animate-fade-up">
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1"><Label>Ngày</Label>
+          <div className="space-y-1"><Label>Date</Label>
             <Input type="date" value={f.reportDate} onChange={(e) => setF({ ...f, reportDate: e.target.value })} required /></div>
-          <div className="space-y-1"><Label>Loại ngày</Label>
+          <div className="space-y-1"><Label>Day type</Label>
             <Select value={f.dayType} onValueChange={(v) => setF({ ...f, dayType: v as DayType })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -88,31 +95,31 @@ function NutritionReport() {
             </Select></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1"><Label>Sáng</Label><Input value={f.breakfast} onChange={(e) => setF({ ...f, breakfast: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Trưa</Label><Input value={f.lunch} onChange={(e) => setF({ ...f, lunch: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Tối</Label><Input value={f.dinner} onChange={(e) => setF({ ...f, dinner: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Ăn vặt</Label><Input value={f.snacks} onChange={(e) => setF({ ...f, snacks: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Trước tập</Label><Input value={f.preWorkoutMeal} onChange={(e) => setF({ ...f, preWorkoutMeal: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Sau tập</Label><Input value={f.postWorkoutMeal} onChange={(e) => setF({ ...f, postWorkoutMeal: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Breakfast</Label><Input value={f.breakfast} onChange={(e) => setF({ ...f, breakfast: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Lunch</Label><Input value={f.lunch} onChange={(e) => setF({ ...f, lunch: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Dinner</Label><Input value={f.dinner} onChange={(e) => setF({ ...f, dinner: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Snacks</Label><Input value={f.snacks} onChange={(e) => setF({ ...f, snacks: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Pre-workout</Label><Input value={f.preWorkoutMeal} onChange={(e) => setF({ ...f, preWorkoutMeal: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Post-workout</Label><Input value={f.postWorkoutMeal} onChange={(e) => setF({ ...f, postWorkoutMeal: e.target.value })} /></div>
         </div>
-        <div className="space-y-1"><Label>Ghi chú</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
-        <Button type="submit" disabled={busy}>
-          {busy ? <><Loader2 className="size-4 mr-1.5 animate-spin" />Đang tính macros…</> : <><Sparkles className="size-4 mr-1.5" />Lưu & tính macros</>}
+        <div className="space-y-1"><Label>Notes</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
+        <Button type="submit" disabled={busy} className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
+          {busy ? <><Loader2 className="size-4 mr-1.5 animate-spin" />Estimating macros…</> : <><Sparkles className="size-4 mr-1.5" />Save & estimate macros</>}
         </Button>
       </form>
 
       <div className="space-y-2">
-        {rows.length === 0 && <div className="text-sm text-muted-foreground text-center py-8">Chưa có báo cáo.</div>}
+        {rows.length === 0 && <div className="text-sm text-slate-400 text-center py-10">No reports yet.</div>}
         {rows.map((r) => (
-          <div key={r.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-            <div className="font-medium">{formatDate(r.reportDate)} <span className="text-xs text-muted-foreground font-normal">• {r.dayType ?? "—"}</span></div>
-            <div className="text-xs text-muted-foreground mt-0.5">
+          <div key={r.id} className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-4 text-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/5">
+            <div className="font-medium text-slate-100">{formatDate(r.reportDate)} <span className="text-xs text-slate-400 font-normal">• {r.dayType ?? "—"}</span></div>
+            <div className="text-xs text-slate-400 mt-0.5">
               {r.calories ?? "—"} kcal • P {r.proteinG ?? 0}g • C {r.carbsG ?? 0}g • F {r.fatsG ?? 0}g
             </div>
             {(r.breakfast || r.lunch || r.dinner) && (
-              <div className="text-xs mt-1 text-muted-foreground">{[r.breakfast, r.lunch, r.dinner, r.snacks].filter(Boolean).join(" · ")}</div>
+              <div className="text-xs mt-1 text-slate-400">{[r.breakfast, r.lunch, r.dinner, r.snacks].filter(Boolean).join(" · ")}</div>
             )}
-            {r.notes && <div className="text-xs mt-1 italic">{r.notes}</div>}
+            {r.notes && <div className="text-xs mt-1 italic text-slate-300">{r.notes}</div>}
           </div>
         ))}
       </div>

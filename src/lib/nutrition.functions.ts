@@ -1,10 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
+import logDevError from '@/lib/error-logger';
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { generateObject } from "ai";
-import { db, schema } from "@/server/db";
-import { requireAuth, newId } from "@/server/auth";
 import { getGroq, FAST_MODEL_ID } from "./trainer/groq";
+
+async function requireSession() {
+  const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
+  const token = readSessionCookie();
+  if (!token) throw new Response("Unauthorized", { status: 401 });
+  const session = validateSessionToken(token);
+  if (!session) throw new Response("Unauthorized", { status: 401 });
+  return session;
+}
 
 const reportInput = z.object({
   reportDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -51,45 +59,53 @@ Post-workout: ${meals.postWorkoutMeal || "(none)"}`;
 }
 
 export const saveNutritionReport = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
   .inputValidator((d: unknown) => reportInput.parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
+    const { newId } = await import("@/server/auth");
     let macros: { calories: number; protein_g: number; carbs_g: number; fats_g: number } | null = null;
     if (data.estimateMacros) {
       try {
         macros = await estimateMacrosForMeals(data);
       } catch (e) {
-        console.error("Macro estimation failed:", e);
+        await logDevError({ error: e, req: null }).catch(() => {});
       }
     }
     const id = newId();
-    db.insert(schema.nutritionReports).values({
-      id,
-      userId: context.userId,
-      reportDate: data.reportDate,
-      breakfast: data.breakfast ?? null,
-      lunch: data.lunch ?? null,
-      dinner: data.dinner ?? null,
-      snacks: data.snacks ?? null,
-      dayType: data.dayType ?? null,
-      preWorkoutMeal: data.preWorkoutMeal ?? null,
-      postWorkoutMeal: data.postWorkoutMeal ?? null,
-      notes: data.notes ?? null,
-      calories: macros?.calories ?? null,
-      proteinG: macros?.protein_g ?? null,
-      carbsG: macros?.carbs_g ?? null,
-      fatsG: macros?.fats_g ?? null,
-    }).run();
-    return { ok: true, id, macros };
+    try {
+      db.insert(schema.nutritionReports).values({
+        id,
+        userId: session.userId,
+        reportDate: data.reportDate,
+        breakfast: data.breakfast ?? null,
+        lunch: data.lunch ?? null,
+        dinner: data.dinner ?? null,
+        snacks: data.snacks ?? null,
+        dayType: data.dayType ?? null,
+        preWorkoutMeal: data.preWorkoutMeal ?? null,
+        postWorkoutMeal: data.postWorkoutMeal ?? null,
+        notes: data.notes ?? null,
+        calories: macros?.calories ?? null,
+        proteinG: macros?.protein_g ?? null,
+        carbsG: macros?.carbs_g ?? null,
+        fatsG: macros?.fats_g ?? null,
+      }).run();
+      return { ok: true, id, macros };
+    } catch (err: any) {
+      await logDevError({ error: err, req: null }).catch(() => {});
+      throw new Response('Server error', { status: 500 });
+    }
   });
 
 export const listNutritionReports = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
     return db
       .select()
       .from(schema.nutritionReports)
-      .where(eq(schema.nutritionReports.userId, context.userId))
+      .where(eq(schema.nutritionReports.userId, session.userId))
       .orderBy(desc(schema.nutritionReports.reportDate))
       .limit(50)
       .all();

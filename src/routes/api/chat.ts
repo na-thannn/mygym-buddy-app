@@ -3,6 +3,7 @@ import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 
 import { readSessionCookie, validateSessionToken } from "@/server/auth";
 import { getGroq, ALEX_MODEL_ID } from "@/lib/trainer/groq";
 import { buildAlexTools } from "@/lib/trainer/tools";
+import { parseRequestBody } from '@/lib/request-utils'
 
 const SYSTEM = `You are Alex, a certified personal trainer chatbot for HL Fitness members.
 Your job is to coach the user through fitness with warmth, expertise, and structure.
@@ -31,7 +32,8 @@ export const Route = createFileRoute("/api/chat")({
         const session = token ? validateSessionToken(token) : null;
         if (!session) return new Response("Unauthorized", { status: 401 });
 
-        const { messages } = (await request.json()) as { messages: UIMessage[] };
+        const body: any = await parseRequestBody(request);
+        const { messages } = (body) as { messages: UIMessage[] };
         const groq = getGroq();
         const tools = buildAlexTools(session.userId);
 

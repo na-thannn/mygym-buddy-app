@@ -49,24 +49,24 @@ function TrainerPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 pt-4 pb-6 flex flex-col h-[100dvh] md:h-screen">
       <PageHeader
-        title="Chat với Alex"
-        subtitle="HLV ảo của bạn — gen kế hoạch, log buổi tập, phân tích tiến độ."
+        title="Chat with Alex"
+        subtitle="Your AI trainer for plans, logs, and progress analysis."
       />
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto rounded-xl border border-border bg-card p-3 md:p-4 space-y-4"
+        className="flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-3 md:p-4 space-y-4 animate-fade-up"
       >
         {messages.length === 0 && (
-          <div className="text-center text-sm text-muted-foreground py-10">
-            <Sparkles className="size-6 mx-auto mb-2 text-primary" />
-            <div className="mb-3">Bắt đầu trò chuyện với Alex.</div>
+          <div className="text-center text-sm text-slate-400 py-10">
+            <Sparkles className="size-6 mx-auto mb-2 text-yellow-300" />
+            <div className="mb-3">Start a conversation with Alex.</div>
             <div className="flex flex-wrap justify-center gap-2">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   onClick={() => submit(s)}
-                  className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-xs hover:bg-accent/80"
+                  className="px-3 py-1.5 rounded-full bg-yellow-400/10 text-yellow-200 text-xs hover:bg-yellow-400/20 transition"
                 >
                   {s}
                 </button>
@@ -87,8 +87,8 @@ function TrainerPage() {
         )}
 
         {error && (
-          <div className="text-sm text-destructive border border-destructive/50 rounded p-2">
-            {error.message || "Lỗi kết nối tới Alex"}
+          <div className="text-sm text-red-300 border border-red-500/40 rounded p-3 bg-red-500/10">
+            {error.message || "Unable to reach Alex"}
           </div>
         )}
       </div>
@@ -110,12 +110,12 @@ function TrainerPage() {
               submit(input);
             }
           }}
-          placeholder="Nhắn cho Alex… (Enter để gửi, Shift+Enter xuống dòng)"
+          placeholder="Message Alex… (Enter to send, Shift+Enter for new line)"
           rows={2}
           className="resize-none"
           disabled={status === "submitted" || status === "streaming"}
         />
-        <Button type="submit" disabled={!input.trim() || status === "submitted" || status === "streaming"}>
+        <Button type="submit" className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300" disabled={!input.trim() || status === "submitted" || status === "streaming"}>
           <Send className="size-4" />
         </Button>
       </form>
@@ -135,10 +135,10 @@ function MessageBubble({ message }: { message: AnyMessage }) {
             <div
               key={i}
               className={cn(
-                "rounded-2xl px-4 py-2.5 max-w-[85%] text-sm",
+                "rounded-2xl px-4 py-2.5 max-w-[85%] text-sm animate-fade-up",
                 isUser
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground prose prose-sm dark:prose-invert max-w-[85%]",
+                  ? "bg-yellow-400 text-yellow-950"
+                  : "bg-white/10 text-slate-100 prose prose-sm prose-invert max-w-[85%]",
               )}
             >
               {isUser ? part.text : <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>}
@@ -165,36 +165,36 @@ function ToolPart({ part }: { part: any }) {
     "output-error": "failed",
   };
   return (
-    <div className="w-full max-w-[85%] rounded-lg border border-border bg-background/50 text-xs">
+    <div className="w-full max-w-[85%] rounded-lg border border-white/10 bg-black/40 text-xs">
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left"
       >
         {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-        <Wrench className="size-3 text-primary" />
+        <Wrench className="size-3 text-yellow-300" />
         <span className="font-mono font-medium">{toolName}</span>
-        <span className="text-muted-foreground ml-auto">{statusLabel[state] ?? state}</span>
+        <span className="text-slate-400 ml-auto">{statusLabel[state] ?? state}</span>
       </button>
       {open && (
-        <div className="px-3 pb-2 space-y-2 border-t border-border pt-2">
+        <div className="px-3 pb-2 space-y-2 border-t border-white/10 pt-2">
           {part.input !== undefined && (
             <div>
-              <div className="text-[10px] uppercase text-muted-foreground mb-1">Input</div>
-              <pre className="bg-muted rounded p-2 overflow-x-auto text-[11px]">
+              <div className="text-[10px] uppercase text-slate-400 mb-1">Input</div>
+              <pre className="bg-white/5 rounded p-2 overflow-x-auto text-[11px]">
                 {JSON.stringify(part.input, null, 2)}
               </pre>
             </div>
           )}
           {part.output !== undefined && (
             <div>
-              <div className="text-[10px] uppercase text-muted-foreground mb-1">Output</div>
-              <pre className="bg-muted rounded p-2 overflow-x-auto text-[11px]">
+              <div className="text-[10px] uppercase text-slate-400 mb-1">Output</div>
+              <pre className="bg-white/5 rounded p-2 overflow-x-auto text-[11px]">
                 {JSON.stringify(part.output, null, 2)}
               </pre>
             </div>
           )}
           {part.errorText && (
-            <div className="text-destructive text-[11px]">{part.errorText}</div>
+            <div className="text-red-300 text-[11px]">{part.errorText}</div>
           )}
         </div>
       )}

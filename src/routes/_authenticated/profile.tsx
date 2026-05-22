@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { getProfile, saveProfile } from "@/lib/profile.functions";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,7 +12,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/profile")({
-  head: () => ({ meta: [{ title: "Hồ sơ — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Profile — HL Fitness" }] }),
   component: ProfilePage,
 });
 
@@ -44,8 +43,22 @@ function ProfilePage() {
   const [f, setF] = useState<Form>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const fetchProfile = useServerFn(getProfile);
-  const doSave = useServerFn(saveProfile);
+  const fetchProfile = async () => {
+    const res = await fetch('/api/profile', { credentials: 'include' });
+    if (!res.ok) return null;
+    return res.json();
+  };
+
+  const doSave = async (payload: any) => {
+    const res = await fetch('/api/profile', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Save failed');
+    return res.json();
+  };
 
   useEffect(() => {
     fetchProfile().then((p) => {
@@ -63,7 +76,7 @@ function ProfilePage() {
       }
       setLoaded(true);
     });
-  }, [fetchProfile]);
+  }, []);
 
   const save = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -82,29 +95,29 @@ function ProfilePage() {
           targetWeightKg: num(f.targetWeightKg),
         },
       });
-      toast.success("Đã lưu hồ sơ");
+      toast.success("Profile saved");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Lưu thất bại");
+      toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
     }
   };
 
-  if (!loaded) return <div className="p-6 text-sm text-muted-foreground">Đang tải…</div>;
+  if (!loaded) return <div className="p-6 text-sm text-slate-400">Loading…</div>;
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6">
-      <PageHeader title="Hồ sơ" subtitle={`Đăng nhập: ${user?.email ?? ""}`} />
-      <form onSubmit={save} className="space-y-5">
+      <PageHeader title="Profile" subtitle={`Signed in as ${user?.email ?? ""}`} />
+      <form onSubmit={save} className="space-y-5 rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-5 animate-fade-up">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label>Mục tiêu</Label>
-            <Input value={f.goal} onChange={(e) => setF({ ...f, goal: e.target.value })} placeholder="vd: Giảm mỡ, tăng cơ" />
+            <Label>Goal</Label>
+            <Input value={f.goal} onChange={(e) => setF({ ...f, goal: e.target.value })} placeholder="Fat loss, lean mass, performance" />
           </div>
           <div className="space-y-1">
-            <Label>Trình độ</Label>
+            <Label>Level</Label>
             <Select value={f.level} onValueChange={(v) => setF({ ...f, level: v })}>
-              <SelectTrigger><SelectValue placeholder="Chọn" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Beginner">Beginner</SelectItem>
                 <SelectItem value="Intermediate">Intermediate</SelectItem>
@@ -113,40 +126,40 @@ function ProfilePage() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Tuổi</Label>
+            <Label>Age</Label>
             <Input type="number" value={f.age} onChange={(e) => setF({ ...f, age: e.target.value })} />
           </div>
           <div className="space-y-1">
-            <Label>Giới tính</Label>
+            <Label>Gender</Label>
             <Select value={f.gender} onValueChange={(v) => setF({ ...f, gender: v })}>
-              <SelectTrigger><SelectValue placeholder="Chọn" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="male">Nam</SelectItem>
-                <SelectItem value="female">Nữ</SelectItem>
-                <SelectItem value="other">Khác</SelectItem>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Chiều cao (cm)</Label>
+            <Label>Height (cm)</Label>
             <Input type="number" step="0.1" value={f.heightCm} onChange={(e) => setF({ ...f, heightCm: e.target.value })} />
           </div>
           <div className="space-y-1">
-            <Label>Cân nặng (kg)</Label>
+            <Label>Weight (kg)</Label>
             <Input type="number" step="0.1" value={f.weightKg} onChange={(e) => setF({ ...f, weightKg: e.target.value })} />
           </div>
           <div className="space-y-1">
-            <Label>Cân nặng mục tiêu (kg)</Label>
+            <Label>Target weight (kg)</Label>
             <Input type="number" step="0.1" value={f.targetWeightKg} onChange={(e) => setF({ ...f, targetWeightKg: e.target.value })} />
           </div>
         </div>
         <div className="space-y-1">
-          <Label>Hạn chế / chấn thương</Label>
-          <Textarea rows={2} maxLength={500} value={f.limitations} onChange={(e) => setF({ ...f, limitations: e.target.value })} placeholder="vd: đau lưng dưới" />
+          <Label>Limitations or injuries</Label>
+          <Textarea rows={2} maxLength={500} value={f.limitations} onChange={(e) => setF({ ...f, limitations: e.target.value })} placeholder="Lower back pain, shoulder issue" />
         </div>
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving} className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
           {saving && <Loader2 className="size-4 mr-2 animate-spin" />}
-          Lưu hồ sơ
+          Save profile
         </Button>
       </form>
     </div>

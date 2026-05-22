@@ -5,6 +5,7 @@ import { db, schema } from "@/server/db";
 import { newId } from "@/server/auth";
 import { estimateMacrosForMeals } from "@/lib/nutrition.functions";
 import { getGroq, ALEX_MODEL_ID } from "./groq";
+import logDevError from '@/lib/error-logger';
 import { generateText } from "ai";
 
 // All tools are bound to a specific userId at request time so the model can never escape that scope.
@@ -128,7 +129,7 @@ Return ONLY the Markdown plan, no preamble.`;
         try {
           macros = await estimateMacrosForMeals(input);
         } catch (e) {
-          console.error("macros failed", e);
+          await logDevError({ error: e, req: null }).catch(() => {});
         }
         const id = newId();
         db.insert(schema.nutritionReports).values({
