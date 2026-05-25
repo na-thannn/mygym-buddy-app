@@ -5,7 +5,12 @@ export function formatDate(d: string | Date) {
 
 export function formatDateTime(d: string | Date) {
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
+  return date.toLocaleString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 export function relativeTime(d: string | Date) {

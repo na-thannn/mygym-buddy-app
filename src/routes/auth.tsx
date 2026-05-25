@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/authContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +36,9 @@ function AuthPage() {
     return res.json();
   };
 
-  const doSignUp = async (payload: { data: { email: string; password: string; displayName: string } }) => {
+  const doSignUp = async (payload: {
+    data: { email: string; password: string; displayName: string };
+  }) => {
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -59,7 +61,9 @@ function AuthPage() {
     const fd = new FormData(e.currentTarget);
     setBusy(true);
     try {
-      await doSignIn({ data: { email: String(fd.get("email") ?? ""), password: String(fd.get("password") ?? "") } });
+      await doSignIn({
+        data: { email: String(fd.get("email") ?? ""), password: String(fd.get("password") ?? "") },
+      });
       await refresh();
       toast.success("Signed in successfully");
     } catch (err) {
@@ -74,7 +78,13 @@ function AuthPage() {
     const fd = new FormData(e.currentTarget);
     setBusy(true);
     try {
-      await doSignUp({ data: { email: String(fd.get("email") ?? ""), password: String(fd.get("password") ?? ""), displayName: String(fd.get("displayName") ?? "") } });
+      await doSignUp({
+        data: {
+          email: String(fd.get("email") ?? ""),
+          password: String(fd.get("password") ?? ""),
+          displayName: String(fd.get("displayName") ?? ""),
+        },
+      });
       await refresh();
       toast.success("Account created");
     } catch (err) {
@@ -88,16 +98,26 @@ function AuthPage() {
     <div className="min-h-screen dark bg-[radial-gradient(circle_at_top,_#1b1f14,_#0f120c_55%,_#090b07_100%)] text-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md animate-scale-in">
         <Link to="/" className="flex items-center gap-3 justify-center mb-6">
-          <img src="/logo.jpg" alt="Logo" className="size-10 rounded-xl object-cover animate-glow" />
+          <img
+            src="/logo.jpg"
+            alt="Logo"
+            className="size-10 rounded-xl object-cover animate-glow"
+          />
           <div className="font-semibold tracking-wide">HL Fitness · Alex AI</div>
         </Link>
         <div className="rounded-2xl border border-white/10 bg-black/50 backdrop-blur p-6 shadow-xl">
           <Tabs defaultValue={mode}>
             <TabsList className="w-full bg-white/10 border border-white/10">
-              <TabsTrigger value="login" className="flex-1 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-950">
+              <TabsTrigger
+                value="login"
+                className="flex-1 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-950"
+              >
                 Sign in
               </TabsTrigger>
-              <TabsTrigger value="signup" className="flex-1 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-950">
+              <TabsTrigger
+                value="signup"
+                className="flex-1 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-950"
+              >
                 Sign up
               </TabsTrigger>
             </TabsList>
@@ -106,13 +126,30 @@ function AuthPage() {
               <form onSubmit={handleLogin} className="space-y-3 mt-4">
                 <div className="space-y-1">
                   <Label htmlFor="li-email">Email</Label>
-                  <Input id="li-email" name="email" type="email" required autoComplete="email" defaultValue={email} />
+                  <Input
+                    id="li-email"
+                    name="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    defaultValue={email}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="li-pw">Password</Label>
-                  <Input id="li-pw" name="password" type="password" required autoComplete="current-password" />
+                  <Input
+                    id="li-pw"
+                    name="password"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                  />
                 </div>
-                <Button type="submit" disabled={busy} className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+                >
                   {busy && <Loader2 className="size-4 mr-2 animate-spin" />}
                   Sign in
                 </Button>
@@ -127,13 +164,31 @@ function AuthPage() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="su-email">Email</Label>
-                  <Input id="su-email" name="email" type="email" required autoComplete="email" defaultValue={email} />
+                  <Input
+                    id="su-email"
+                    name="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    defaultValue={email}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="su-pw">Password</Label>
-                  <Input id="su-pw" name="password" type="password" required minLength={6} autoComplete="new-password" />
+                  <Input
+                    id="su-pw"
+                    name="password"
+                    type="password"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                  />
                 </div>
-                <Button type="submit" disabled={busy} className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+                >
                   {busy && <Loader2 className="size-4 mr-2 animate-spin" />}
                   Create account
                 </Button>
@@ -143,10 +198,12 @@ function AuthPage() {
         </div>
 
         <div className="text-center mt-6">
-          <Button asChild variant="ghost" className="text-slate-400 hover:text-slate-200 hover:bg-white/5">
-            <Link to="/">
-              ← Back to home
-            </Link>
+          <Button
+            asChild
+            variant="ghost"
+            className="text-slate-400 hover:text-slate-200 hover:bg-white/5"
+          >
+            <Link to="/">← Back to home</Link>
           </Button>
         </div>
       </div>

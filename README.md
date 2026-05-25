@@ -7,9 +7,9 @@ Built with TanStack Start, Drizzle ORM, AI SDK v6, and the Groq API
 ## Run locally
 
 ```bash
-bun install
+npm install
 echo 'GROQ_API_KEY=gsk_your_key_here' > .env.local
-bun run dev
+npm run dev
 ```
 
 Then open http://localhost:5173.
@@ -37,4 +37,4 @@ boot. To reset everything, delete that file.
   without external services besides the Groq API.
 - The Lovable in-browser preview will not work because `better-sqlite3`
   is a native Node addon and cannot run in the Cloudflare Worker SSR
-  runtime — always run with `bun run dev`.
+  runtime — run locally with `npm run dev`.

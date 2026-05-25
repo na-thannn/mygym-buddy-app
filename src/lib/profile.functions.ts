@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import logDevError from '@/lib/error-logger';
+import logDevError from "@/lib/error-logger";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
@@ -12,17 +12,16 @@ async function requireSession() {
   return session;
 }
 
-export const getProfile = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const session = await requireSession();
-    const { db, schema } = await import("@/server/db");
-    const row = db
-      .select()
-      .from(schema.profiles)
-      .where(eq(schema.profiles.userId, session.userId))
-      .get();
-    return row ?? null;
-  });
+export const getProfile = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await requireSession();
+  const { db, schema } = await import("@/server/db");
+  const row = db
+    .select()
+    .from(schema.profiles)
+    .where(eq(schema.profiles.userId, session.userId))
+    .get();
+  return row ?? null;
+});
 
 const saveProfileInput = z.object({
   goal: z.string().max(500).nullable().optional(),
@@ -49,13 +48,15 @@ export const saveProfile = createServerFn({ method: "POST" })
     if (existing) {
       db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, session.userId)).run();
     } else {
-        try {
-          db.insert(schema.profiles).values({ userId: session.userId, ...patch }).run();
-          return { ok: true };
-        } catch (err: any) {
-          await logDevError({ error: err, req: null }).catch(() => {});
-          throw new Response('Server error', { status: 500 });
-        }
+      try {
+        db.insert(schema.profiles)
+          .values({ userId: session.userId, ...patch })
+          .run();
+        return { ok: true };
+      } catch (err) {
+        await logDevError({ error: err, req: null }).catch(() => {});
+        throw new Response("Server error", { status: 500 });
+      }
     }
     return { ok: true };
   });

@@ -5,7 +5,7 @@ import { db, schema } from "@/server/db";
 import { newId } from "@/server/auth";
 import { estimateMacrosForMeals } from "@/lib/nutrition.functions";
 import { getGroq, ALEX_MODEL_ID } from "./groq";
-import logDevError from '@/lib/error-logger';
+import logDevError from "@/lib/error-logger";
 import { generateText } from "ai";
 
 // All tools are bound to a specific userId at request time so the model can never escape that scope.
@@ -24,12 +24,18 @@ export function buildAlexTools(userId: string) {
         weightKg: z.number().min(20).max(400).optional(),
       }),
       execute: async (input) => {
-        const existing = db.select({ userId: schema.profiles.userId }).from(schema.profiles).where(eq(schema.profiles.userId, userId)).get();
+        const existing = db
+          .select({ userId: schema.profiles.userId })
+          .from(schema.profiles)
+          .where(eq(schema.profiles.userId, userId))
+          .get();
         const patch = { ...input, updatedAt: new Date().toISOString() };
         if (existing) {
           db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, userId)).run();
         } else {
-          db.insert(schema.profiles).values({ userId, ...patch }).run();
+          db.insert(schema.profiles)
+            .values({ userId, ...patch })
+            .run();
         }
         return { ok: true, saved: input };
       },
@@ -39,7 +45,11 @@ export function buildAlexTools(userId: string) {
       description: "Read the current user's profile (goal, level, limitations, age, weight, etc).",
       inputSchema: z.object({}),
       execute: async () => {
-        const row = db.select().from(schema.profiles).where(eq(schema.profiles.userId, userId)).get();
+        const row = db
+          .select()
+          .from(schema.profiles)
+          .where(eq(schema.profiles.userId, userId))
+          .get();
         return row ?? { empty: true };
       },
     }),
@@ -53,7 +63,11 @@ export function buildAlexTools(userId: string) {
         equipment: z.string().describe("e.g. 'Full gym', 'Dumbbells at home', 'Bodyweight only'"),
       }),
       execute: async ({ planDate, daysPerWeek, equipment }) => {
-        const profile = db.select().from(schema.profiles).where(eq(schema.profiles.userId, userId)).get();
+        const profile = db
+          .select()
+          .from(schema.profiles)
+          .where(eq(schema.profiles.userId, userId))
+          .get();
         const groq = getGroq();
         const sys = `You are Alex, a certified personal trainer. Generate a complete workout plan in Markdown.
 RULES:
@@ -79,13 +93,15 @@ Return ONLY the Markdown plan, no preamble.`;
           ],
         });
         const id = newId();
-        db.insert(schema.workoutPlanDocs).values({
-          id,
-          userId,
-          planDate,
-          title: `Plan for ${planDate} — ${daysPerWeek}`,
-          contentMd: text,
-        }).run();
+        db.insert(schema.workoutPlanDocs)
+          .values({
+            id,
+            userId,
+            planDate,
+            title: `Plan for ${planDate} — ${daysPerWeek}`,
+            contentMd: text,
+          })
+          .run();
         return { ok: true, planDate, preview: text.slice(0, 400) };
       },
     }),
@@ -105,7 +121,9 @@ Return ONLY the Markdown plan, no preamble.`;
       }),
       execute: async (input) => {
         const id = newId();
-        db.insert(schema.workoutLogs).values({ id, userId, ...input }).run();
+        db.insert(schema.workoutLogs)
+          .values({ id, userId, ...input })
+          .run();
         return { ok: true, id };
       },
     }),
@@ -125,36 +143,44 @@ Return ONLY the Markdown plan, no preamble.`;
         notes: z.string().optional(),
       }),
       execute: async (input) => {
-        let macros: { calories: number; protein_g: number; carbs_g: number; fats_g: number } | null = null;
+        let macros: {
+          calories: number;
+          protein_g: number;
+          carbs_g: number;
+          fats_g: number;
+        } | null = null;
         try {
           macros = await estimateMacrosForMeals(input);
         } catch (e) {
           await logDevError({ error: e, req: null }).catch(() => {});
         }
         const id = newId();
-        db.insert(schema.nutritionReports).values({
-          id,
-          userId,
-          reportDate: input.reportDate,
-          breakfast: input.breakfast,
-          lunch: input.lunch,
-          dinner: input.dinner,
-          snacks: input.snacks,
-          dayType: input.dayType,
-          preWorkoutMeal: input.preWorkoutMeal,
-          postWorkoutMeal: input.postWorkoutMeal,
-          notes: input.notes,
-          calories: macros?.calories,
-          proteinG: macros?.protein_g,
-          carbsG: macros?.carbs_g,
-          fatsG: macros?.fats_g,
-        }).run();
+        db.insert(schema.nutritionReports)
+          .values({
+            id,
+            userId,
+            reportDate: input.reportDate,
+            breakfast: input.breakfast,
+            lunch: input.lunch,
+            dinner: input.dinner,
+            snacks: input.snacks,
+            dayType: input.dayType,
+            preWorkoutMeal: input.preWorkoutMeal,
+            postWorkoutMeal: input.postWorkoutMeal,
+            notes: input.notes,
+            calories: macros?.calories,
+            proteinG: macros?.protein_g,
+            carbsG: macros?.carbs_g,
+            fatsG: macros?.fats_g,
+          })
+          .run();
         return { ok: true, id, macros };
       },
     }),
 
     log_progress_report: tool({
-      description: "Save a weekly progress report (total sessions, streak days, total volume in kg, notes).",
+      description:
+        "Save a weekly progress report (total sessions, streak days, total volume in kg, notes).",
       inputSchema: z.object({
         reportDate: z.string(),
         totalSessions: z.number().int().min(0).max(50),
@@ -164,19 +190,27 @@ Return ONLY the Markdown plan, no preamble.`;
       }),
       execute: async (input) => {
         const id = newId();
-        db.insert(schema.progressReports).values({ id, userId, ...input }).run();
+        db.insert(schema.progressReports)
+          .values({ id, userId, ...input })
+          .run();
         return { ok: true, id };
       },
     }),
 
     get_plan_for_date: tool({
-      description: "Fetch the saved workout plan Markdown for a date (used before analyzing progress).",
+      description:
+        "Fetch the saved workout plan Markdown for a date (used before analyzing progress).",
       inputSchema: z.object({ planDate: z.string() }),
       execute: async ({ planDate }) => {
         const row = db
           .select()
           .from(schema.workoutPlanDocs)
-          .where(and(eq(schema.workoutPlanDocs.userId, userId), eq(schema.workoutPlanDocs.planDate, planDate)))
+          .where(
+            and(
+              eq(schema.workoutPlanDocs.userId, userId),
+              eq(schema.workoutPlanDocs.planDate, planDate),
+            ),
+          )
           .orderBy(desc(schema.workoutPlanDocs.createdAt))
           .get();
         return row ?? { empty: true, message: `No plan saved for ${planDate}` };
@@ -190,7 +224,12 @@ Return ONLY the Markdown plan, no preamble.`;
         const rows = db
           .select()
           .from(schema.workoutLogs)
-          .where(and(eq(schema.workoutLogs.userId, userId), gte(schema.workoutLogs.performedAt, fromDate)))
+          .where(
+            and(
+              eq(schema.workoutLogs.userId, userId),
+              gte(schema.workoutLogs.performedAt, fromDate),
+            ),
+          )
           .orderBy(desc(schema.workoutLogs.performedAt))
           .all();
         return { count: rows.length, entries: rows };

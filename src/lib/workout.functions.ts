@@ -29,13 +29,21 @@ export const logWorkoutEntry = createServerFn({ method: "POST" })
     const { db, schema } = await import("@/server/db");
     const { newId } = await import("@/server/auth");
     const id = newId();
-    db.insert(schema.workoutLogs).values({ id, userId: session.userId, ...data }).run();
+    db.insert(schema.workoutLogs)
+      .values({ id, userId: session.userId, ...data })
+      .run();
     return { ok: true, id };
   });
 
 export const listRecentWorkouts = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) =>
-    z.object({ fromDate: z.string().optional(), toDate: z.string().optional(), limit: z.number().int().min(1).max(200).default(50) }).parse(d ?? {}),
+    z
+      .object({
+        fromDate: z.string().optional(),
+        toDate: z.string().optional(),
+        limit: z.number().int().min(1).max(200).default(50),
+      })
+      .parse(d ?? {}),
   )
   .handler(async ({ data }) => {
     const session = await requireSession();

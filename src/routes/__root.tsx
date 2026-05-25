@@ -75,10 +75,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "HL Fitness — Training community at 303 Le Thanh Nghi, Da Nang" },
-      { name: "description", content: "Track progress, InBody, and AI coaching for HL Fitness 303 Le Thanh Nghi members." },
+      {
+        name: "description",
+        content:
+          "Track progress, InBody, and AI coaching for HL Fitness 303 Le Thanh Nghi members.",
+      },
       { name: "author", content: "HL Fitness" },
       { property: "og:title", content: "HL Fitness — 303 Le Thanh Nghi" },
-      { property: "og:description", content: "Track InBody, workouts, and nutrition with trainer support." },
+      {
+        property: "og:description",
+        content: "Track InBody, workouts, and nutrition with trainer support.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },

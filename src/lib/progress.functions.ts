@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
+import logDevError from "@/lib/error-logger";
 
 async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
@@ -27,23 +28,24 @@ export const saveProgressReport = createServerFn({ method: "POST" })
     const { newId } = await import("@/server/auth");
     const id = newId();
     try {
-      db.insert(schema.progressReports).values({ id, userId: session.userId, ...data }).run();
+      db.insert(schema.progressReports)
+        .values({ id, userId: session.userId, ...data })
+        .run();
       return { ok: true, id };
-    } catch (err: any) {
+    } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
-      throw new Response('Server error', { status: 500 });
+      throw new Response("Server error", { status: 500 });
     }
   });
 
-export const listProgressReports = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const session = await requireSession();
-    const { db, schema } = await import("@/server/db");
-    return db
-      .select()
-      .from(schema.progressReports)
-      .where(eq(schema.progressReports.userId, session.userId))
-      .orderBy(desc(schema.progressReports.reportDate))
-      .limit(50)
-      .all();
-  });
+export const listProgressReports = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await requireSession();
+  const { db, schema } = await import("@/server/db");
+  return db
+    .select()
+    .from(schema.progressReports)
+    .where(eq(schema.progressReports.userId, session.userId))
+    .orderBy(desc(schema.progressReports.reportDate))
+    .limit(50)
+    .all();
+});

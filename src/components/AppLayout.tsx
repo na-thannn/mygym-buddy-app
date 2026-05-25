@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/authContext";
 import { Button } from "@/components/ui/button";
 import {
   Activity,
@@ -19,7 +19,14 @@ import {
   LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetClose } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+  SheetDescription,
+  SheetClose,
+} from "@/components/ui/sheet";
 
 type NavItem = { to: string; label: string; icon: typeof Activity };
 
@@ -51,12 +58,22 @@ export function AppLayout({ children }: { children?: ReactNode }) {
     if (typeof window === "undefined") return;
     // Patch global fetch to include credentials by default so RPC and fetches send cookies
     // only patch once
-    const anyWin = window as any;
-    if (anyWin.__fetchPatched) return;
-    const origFetch = window.fetch.bind(window);
-    anyWin.__fetchPatched = true;
-    window.fetch = (input: RequestInfo, init?: RequestInit) => {
-      const merged: RequestInit = { ...(init || {}), credentials: (init && init.credentials) ?? "include" };
+    type WinExt = Window & { __fetchPatched?: boolean };
+    const win = window as unknown as WinExt;
+    if (win.__fetchPatched) return;
+    const origFetch = win.fetch.bind(win) as (
+      input: RequestInfo,
+      init?: RequestInit,
+    ) => Promise<Response>;
+    win.__fetchPatched = true;
+    (win.fetch as (input: RequestInfo, init?: RequestInit) => Promise<Response>) = (
+      input: RequestInfo,
+      init?: RequestInit,
+    ) => {
+      const merged: RequestInit = {
+        ...(init || {}),
+        credentials: (init && init.credentials) ?? "include",
+      };
       return origFetch(input, merged);
     };
   }, []);
@@ -70,7 +87,11 @@ export function AppLayout({ children }: { children?: ReactNode }) {
       <div className="relative z-10 flex flex-col md:flex-row">
         <aside className="hidden md:flex w-64 shrink-0 border-r border-white/10 bg-black/40 backdrop-blur flex-col p-4 gap-1 sticky top-0 h-screen">
           <Link to="/feed" className="flex items-center gap-3 px-2 py-3 mb-2 animate-slide-in-left">
-            <img src="/logo.jpg" alt="Logo" className="size-9 rounded-xl object-cover animate-glow" />
+            <img
+              src="/logo.jpg"
+              alt="Logo"
+              className="size-9 rounded-xl object-cover animate-glow"
+            />
             <div>
               <div className="font-semibold leading-none">HL Fitness</div>
               <div className="text-[10px] text-slate-300">with Alex AI</div>
@@ -119,11 +140,17 @@ export function AppLayout({ children }: { children?: ReactNode }) {
                   <span className="sr-only">Toggle Menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-64 bg-[#0a0c08] border-r border-white/10 p-0 flex flex-col">
+              <SheetContent
+                side="left"
+                className="w-64 bg-[#0a0c08] border-r border-white/10 p-0 flex flex-col"
+              >
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <SheetDescription className="sr-only">Access all app pages.</SheetDescription>
-                
-                <Link to="/feed" className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
+
+                <Link
+                  to="/feed"
+                  className="flex items-center gap-3 px-4 py-5 border-b border-white/10"
+                >
                   <img src="/logo.jpg" alt="Logo" className="size-9 rounded-xl object-cover" />
                   <div>
                     <div className="font-semibold leading-none text-slate-100">HL Fitness</div>

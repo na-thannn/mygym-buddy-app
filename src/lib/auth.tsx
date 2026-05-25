@@ -1,15 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-
-export type AppUser = { id: string; email: string; displayName: string };
-
-interface AuthCtx {
-  user: AppUser | null;
-  loading: boolean;
-  refresh: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
-
-const Ctx = createContext<AuthCtx | undefined>(undefined);
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Ctx, type AppUser } from "./authContext";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -52,10 +42,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </Ctx.Provider>
   );
-}
-
-export function useAuth() {
-  const c = useContext(Ctx);
-  if (!c) throw new Error("useAuth must be used inside AuthProvider");
-  return c;
 }

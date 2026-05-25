@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import logDevError from '@/lib/error-logger';
+import logDevError from "@/lib/error-logger";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
@@ -14,23 +14,29 @@ export const signUp = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db, schema } = await import("@/server/db");
     const { createSession, hashPassword, setSessionCookie, newId } = await import("@/server/auth");
-    const existing = db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, data.email)).get();
+    const existing = db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, data.email))
+      .get();
     if (existing) throw new Error("Email is already in use");
     const id = newId();
     try {
-      db.insert(schema.users).values({
-        id,
-        email: data.email,
-        passwordHash: hashPassword(data.password),
-        displayName: data.displayName,
-      }).run();
+      db.insert(schema.users)
+        .values({
+          id,
+          email: data.email,
+          passwordHash: hashPassword(data.password),
+          displayName: data.displayName,
+        })
+        .run();
       db.insert(schema.profiles).values({ userId: id }).run();
       const { token, expiresAt } = createSession(id);
       setSessionCookie(token, expiresAt);
       return { id, email: data.email, displayName: data.displayName };
-    } catch (err: any) {
+    } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
-      throw new Response('Server error', { status: 500 });
+      throw new Response("Server error", { status: 500 });
     }
   });
 
@@ -44,11 +50,7 @@ export const signIn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db, schema } = await import("@/server/db");
     const { createSession, verifyPassword, setSessionCookie } = await import("@/server/auth");
-    const user = db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.email, data.email))
-      .get();
+    const user = db.select().from(schema.users).where(eq(schema.users.email, data.email)).get();
     if (!user || !verifyPassword(data.password, user.passwordHash)) {
       throw new Error("Email or password is incorrect");
     }
@@ -58,7 +60,8 @@ export const signIn = createServerFn({ method: "POST" })
   });
 
 export const signOut = createServerFn({ method: "POST" }).handler(async () => {
-  const { readSessionCookie, invalidateSessionToken, clearSessionCookie } = await import("@/server/auth");
+  const { readSessionCookie, invalidateSessionToken, clearSessionCookie } =
+    await import("@/server/auth");
   const token = readSessionCookie();
   if (token) invalidateSessionToken(token);
   clearSessionCookie();

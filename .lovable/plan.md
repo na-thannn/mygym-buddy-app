@@ -1,6 +1,7 @@
 ## Goal
 
 Recreate the exported Copilot Studio "Personal Gym Trainer" agent as a local-first web app:
+
 - **DB**: SQLite (`better-sqlite3`) via Drizzle ORM, file at `./data/app.db`
 - **Auth**: local email+password using Lucia-style sessions (httpOnly cookie + sessions table)
 - **AI**: Groq API (`llama-3.3-70b-versatile`) via OpenAI-compatible endpoint, your own `GROQ_API_KEY`
@@ -15,18 +16,20 @@ Recreate the exported Copilot Studio "Personal Gym Trainer" agent as a local-fir
 ## What we build (mirrors the agent 1:1)
 
 ### Topics → routes/tools
-| Agent topic | Implementation |
-|---|---|
-| ConversationStart / Greeting (profile setup) | Tool `save_profile` + chat flow asks goal, level, limitations, age, weight, height |
-| GenerateAndSaveWorkoutPlan | Tool `generate_workout_plan` → Groq → save Markdown to `workout_plan_docs` keyed by date |
-| ExportWorkoutPlan (log session, loops) | Tool `log_workout_entry`, chat asks again "log another?" |
-| ExportNutritionAdviceTopic (+ Estimate Macros AI) | Tool `log_nutrition_report` → second Groq call to estimate macros → save |
-| ExportUserProgressTopic | Tool `log_progress_report` |
-| CompareProgresstoPlan (+ Analyse Progress AI) | Tools `get_plan_md` + `get_recent_workouts` + `analyze_progress` → save `.md` to `analyses` |
-| MotivationBoost / RestDayAdvice | Tools with the 4 canned options each (from the export) |
-| Fallback / general fitness Q&A | Default model behavior |
+
+| Agent topic                                       | Implementation                                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| ConversationStart / Greeting (profile setup)      | Tool `save_profile` + chat flow asks goal, level, limitations, age, weight, height          |
+| GenerateAndSaveWorkoutPlan                        | Tool `generate_workout_plan` → Groq → save Markdown to `workout_plan_docs` keyed by date    |
+| ExportWorkoutPlan (log session, loops)            | Tool `log_workout_entry`, chat asks again "log another?"                                    |
+| ExportNutritionAdviceTopic (+ Estimate Macros AI) | Tool `log_nutrition_report` → second Groq call to estimate macros → save                    |
+| ExportUserProgressTopic                           | Tool `log_progress_report`                                                                  |
+| CompareProgresstoPlan (+ Analyse Progress AI)     | Tools `get_plan_md` + `get_recent_workouts` + `analyze_progress` → save `.md` to `analyses` |
+| MotivationBoost / RestDayAdvice                   | Tools with the 4 canned options each (from the export)                                      |
+| Fallback / general fitness Q&A                    | Default model behavior                                                                      |
 
 ### Form pages (kept as backup UI, simplified)
+
 - `/profile` — edit profile
 - `/plans` — list saved `workout_plan_docs` (Markdown)
 - `/analyses` — list saved analyses
@@ -36,6 +39,7 @@ Recreate the exported Copilot Studio "Personal Gym Trainer" agent as a local-fir
 ## Technical plan
 
 ### Dependencies to add
+
 - `better-sqlite3`, `drizzle-orm`, `drizzle-kit`
 - `@oslojs/crypto`, `@oslojs/encoding` (session token hashing)
 - `@ai-sdk/openai-compatible`, `ai`, `@ai-sdk/react`, `zod`
@@ -73,6 +77,7 @@ src/lib/auth.tsx                  rewritten AuthProvider (calls auth.functions, 
 ```
 
 ### AI client
+
 ```ts
 // src/lib/trainer/groq.ts
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
@@ -85,15 +90,19 @@ export const ALEX_MODEL = groq("llama-3.3-70b-versatile");
 ```
 
 ### System prompt (from the export)
+
 Use Alex's responseInstructions verbatim: encouraging tone, plans in tables, nutrition in bullets, redirect injuries to physio. Injects current profile into the system message so tools have context.
 
 ### Tool calling loop
+
 `streamText` with `stopWhen: stepCountIs(50)`, tools defined per-flow. The chat is the agent — tools persist data, model writes the prose.
 
 ### Files to delete (agent has no equivalent)
+
 `src/routes/_authenticated/{admin,coach,feed,inbody,pt,log.nutrition,log.workout}.tsx` will be either deleted or rewritten. AppLayout nav stripped.
 
 ### Migration order
+
 1. Add deps + scaffold `src/server/db` and `src/server/auth` (no UI change yet)
 2. Add `GROQ_API_KEY` secret
 3. Rewrite `auth.tsx` + `/auth` route to use local sessions

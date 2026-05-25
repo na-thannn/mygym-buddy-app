@@ -3,56 +3,102 @@ import { z } from "zod";
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { hashPassword, createSession, setSessionCookie } from "@/server/auth";
-import { parseRequestBody } from '@/lib/request-utils'
-import logDevError from '@/lib/error-logger'
+import { parseRequestBody } from "@/lib/request-utils";
+import logDevError from "@/lib/error-logger";
+import type { MaybeWrappedRequest } from "@/types/dev";
 
 const inputSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 
 export const Route = createFileRoute("/api/signin")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async (ctx: unknown) => {
+        const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
+        const request = maybe.request ?? (ctx as unknown as Request);
+        const reqWrapped = request as unknown as MaybeWrappedRequest;
+        const innerWrapped = maybe.request
+          ? (maybe.request as unknown as MaybeWrappedRequest)
+          : undefined;
         try {
           try {
-            logDevError({ error: new Error('signin: request snapshot'), req: { keys: Object.keys(request || {}).slice(0, 20), hasRequestProp: !!request?.request, outerJsonType: typeof request?.json, innerJsonType: typeof request?.request?.json } }).catch(() => {});
+            logDevError({
+              error: new Error("signin: request snapshot"),
+              req: {
+                keys: Object.keys(request || {}).slice(0, 20),
+                hasRequestProp: !!maybe.request,
+                outerJsonType: typeof reqWrapped.json,
+                innerJsonType: typeof innerWrapped?.json,
+              },
+            }).catch(() => {});
           } catch (_) {}
-          let body: any = await parseRequestBody(request);
-          if (!body || Object.keys(body).length === 0) {
+          let body: unknown = await parseRequestBody(request as unknown);
+          if (
+            !body ||
+            (typeof body === "object" && Object.keys(body as Record<string, unknown>).length === 0)
+          ) {
             try {
-              if (typeof request?.text === 'function') {
-                const txt = await request.text();
+              if (typeof reqWrapped.text === "function") {
+                const txt = await (reqWrapped as unknown as Request).text();
                 body = txt ? JSON.parse(txt) : {};
-              } else if (typeof request?.request?.text === 'function') {
-                const txt = await request.request.text();
+              } else if (maybe.request && typeof innerWrapped?.text === "function") {
+                const txt = await (innerWrapped as unknown as Request).text();
                 body = txt ? JSON.parse(txt) : {};
-              } else if (request?.body) {
-                body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body;
+              } else if (reqWrapped?.body) {
+                body =
+                  typeof reqWrapped.body === "string"
+                    ? JSON.parse(reqWrapped.body as string)
+                    : reqWrapped.body;
               }
             } catch (_) {}
           }
           const parsed = inputSchema.safeParse(body);
           if (!parsed.success) {
-            return new Response(JSON.stringify({ error: parsed.error.flatten() }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return new Response(JSON.stringify({ error: parsed.error.flatten() }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
           }
           const data = parsed.data;
-          const user = db.select().from(schema.users).where(eq(schema.users.email, data.email)).get();
+          const user = db
+            .select()
+            .from(schema.users)
+            .where(eq(schema.users.email, data.email))
+            .get();
           if (!user) {
-            return new Response(JSON.stringify({ error: "Email or password is incorrect" }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return new Response(JSON.stringify({ error: "Email or password is incorrect" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
           }
           const { verifyPassword } = await import("@/server/auth");
-          const verified = await verifyPassword(data.password, user.passwordHash ?? user.password_hash ?? user.password_hash);
+          const verified = await verifyPassword(data.password, user.passwordHash);
           if (!verified) {
-            return new Response(JSON.stringify({ error: "Email or password is incorrect" }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return new Response(JSON.stringify({ error: "Email or password is incorrect" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
           }
           const { token, expiresAt } = createSession(user.id);
           setSessionCookie(token, expiresAt);
-          return new Response(JSON.stringify({ id: user.id, email: user.email, displayName: user.displayName ?? user.display_name }), {
-            status: 200,
+          return new Response(
+            JSON.stringify({
+              id: user.id,
+              email: user.email,
+              displayName: user.displayName,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        } catch (err: unknown) {
+          await logDevError({ error: err, req: { method: "POST", url: "/api/signin" } }).catch(
+            () => {},
+          );
+          return new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
             headers: { "Content-Type": "application/json" },
           });
-        } catch (err: any) {
-          await logDevError({ error: err, req: { method: 'POST', url: '/api/signin' } }).catch(() => {});
-          return new Response(JSON.stringify({ error: "Internal server error" }), { status: 500, headers: { "Content-Type": "application/json" } });
         }
       },
     },

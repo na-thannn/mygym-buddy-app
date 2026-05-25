@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import logDevError from '@/lib/error-logger';
+import logDevError from "@/lib/error-logger";
 import { z } from "zod";
 import { desc } from "drizzle-orm";
 
@@ -23,37 +23,38 @@ export const addFeedPost = createServerFn({ method: "POST" })
     const session = await requireSession();
     const { db, schema } = await import("@/server/db");
     const { newId } = await import("@/server/auth");
-    
+
     const id = newId();
     try {
-      db.insert(schema.communityFeed).values({ id, userId: session.userId, ...data }).run();
+      db.insert(schema.communityFeed)
+        .values({ id, userId: session.userId, ...data })
+        .run();
       return { ok: true, id };
-    } catch (err: any) {
+    } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
-      throw new Response('Server error', { status: 500 });
+      throw new Response("Server error", { status: 500 });
     }
   });
 
-export const listFeedPosts = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const session = await requireSession(); // Ensure user is logged in
-    const { db, schema } = await import("@/server/db");
-    const { eq } = await import("drizzle-orm");
+export const listFeedPosts = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await requireSession(); // Ensure user is logged in
+  const { db, schema } = await import("@/server/db");
+  const { eq } = await import("drizzle-orm");
 
-    const rows = db
-      .select({
-        id: schema.communityFeed.id,
-        content: schema.communityFeed.content,
-        imageBase64: schema.communityFeed.imageBase64,
-        likesCount: schema.communityFeed.likesCount,
-        createdAt: schema.communityFeed.createdAt,
-        authorName: schema.users.displayName,
-      })
-      .from(schema.communityFeed)
-      .leftJoin(schema.users, eq(schema.communityFeed.userId, schema.users.id))
-      .orderBy(desc(schema.communityFeed.createdAt))
-      .limit(50)
-      .all();
-      
-    return rows;
-  });
+  const rows = db
+    .select({
+      id: schema.communityFeed.id,
+      content: schema.communityFeed.content,
+      imageBase64: schema.communityFeed.imageBase64,
+      likesCount: schema.communityFeed.likesCount,
+      createdAt: schema.communityFeed.createdAt,
+      authorName: schema.users.displayName,
+    })
+    .from(schema.communityFeed)
+    .leftJoin(schema.users, eq(schema.communityFeed.userId, schema.users.id))
+    .orderBy(desc(schema.communityFeed.createdAt))
+    .limit(50)
+    .all();
+
+  return rows;
+});

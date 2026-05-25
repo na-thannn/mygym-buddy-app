@@ -6,7 +6,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  { ignores: ["dist", ".output", ".vinxi", "src/routeTree.gen.ts"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -34,6 +34,10 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Re-enable `no-explicit-any` as an error once UI sweep completes.
+      "@typescript-eslint/no-explicit-any": "error",
+      // Allow empty catch blocks in places where we intentionally ignore errors (dev-only logging paths).
+      "no-empty": ["warn", { allowEmptyCatch: true }],
     },
   },
   eslintPluginPrettier,

@@ -11,7 +11,7 @@ import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/trainer")({
-  head: () => ({ meta: [{ title: "Alex — AI Trainer" }] }),
+  head: () => ({ meta: [{ title: "AI Coach — HL Fitness" }] }),
   component: TrainerPage,
 });
 
@@ -49,7 +49,7 @@ function TrainerPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 pt-4 pb-6 flex flex-col h-[100dvh] md:h-screen">
       <PageHeader
-        title="Chat with Alex"
+        title="Chat with AI Coach"
         subtitle="Your AI trainer for plans, logs, and progress analysis."
       />
 
@@ -60,7 +60,7 @@ function TrainerPage() {
         {messages.length === 0 && (
           <div className="text-center text-sm text-slate-400 py-10">
             <Sparkles className="size-6 mx-auto mb-2 text-yellow-300" />
-            <div className="mb-3">Start a conversation with Alex.</div>
+            <div className="mb-3">Start a conversation with AI Coach.</div>
             <div className="flex flex-wrap justify-center gap-2">
               {SUGGESTIONS.map((s) => (
                 <button
@@ -82,13 +82,13 @@ function TrainerPage() {
         {status === "submitted" && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Alex is thinking…
+            AI Coach is thinking…
           </div>
         )}
 
         {error && (
           <div className="text-sm text-red-300 border border-red-500/40 rounded p-3 bg-red-500/10">
-            {error.message || "Unable to reach Alex"}
+            {error.message || "Unable to reach AI Coach"}
           </div>
         )}
       </div>
@@ -110,12 +110,16 @@ function TrainerPage() {
               submit(input);
             }
           }}
-          placeholder="Message Alex… (Enter to send, Shift+Enter for new line)"
+          placeholder="Message AI Coach… (Enter to send, Shift+Enter for new line)"
           rows={2}
           className="resize-none"
           disabled={status === "submitted" || status === "streaming"}
         />
-        <Button type="submit" className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300" disabled={!input.trim() || status === "submitted" || status === "streaming"}>
+        <Button
+          type="submit"
+          className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+          disabled={!input.trim() || status === "submitted" || status === "streaming"}
+        >
           <Send className="size-4" />
         </Button>
       </form>
@@ -141,7 +145,11 @@ function MessageBubble({ message }: { message: AnyMessage }) {
                   : "bg-white/10 text-slate-100 prose prose-sm prose-invert max-w-[85%]",
               )}
             >
-              {isUser ? part.text : <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>}
+              {isUser ? (
+                part.text
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
+              )}
             </div>
           );
         }
@@ -154,7 +162,15 @@ function MessageBubble({ message }: { message: AnyMessage }) {
   );
 }
 
-function ToolPart({ part }: { part: any }) {
+type ToolPartShape = {
+  type?: string;
+  state?: string;
+  input?: unknown;
+  output?: unknown;
+  errorText?: string;
+};
+
+function ToolPart({ part }: { part: ToolPartShape }) {
   const [open, setOpen] = useState(false);
   const toolName = String(part.type).replace(/^tool-/, "");
   const state = part.state as string;
@@ -193,9 +209,7 @@ function ToolPart({ part }: { part: any }) {
               </pre>
             </div>
           )}
-          {part.errorText && (
-            <div className="text-red-300 text-[11px]">{part.errorText}</div>
-          )}
+          {part.errorText && <div className="text-red-300 text-[11px]">{part.errorText}</div>}
         </div>
       )}
     </div>

@@ -8,10 +8,17 @@ export const Route = createFileRoute("/api/current-user")({
         const token = readSessionCookie();
         const session = token ? validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
-        return new Response(JSON.stringify({ id: session.userId, email: session.email, displayName: session.displayName }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({
+            id: session.userId,
+            email: session.email,
+            displayName: session.displayName,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       },
     },
   },

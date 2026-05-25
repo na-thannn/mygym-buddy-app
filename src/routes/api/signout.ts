@@ -8,7 +8,10 @@ export const Route = createFileRoute("/api/signout")({
         const token = readSessionCookie();
         if (token) invalidateSessionToken(token);
         clearSessionCookie();
-        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       },
     },
   },

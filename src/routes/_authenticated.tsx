@@ -16,7 +16,10 @@ export const Route = createFileRoute("/_authenticated")({
       }
     }
     if (!user) {
-      throw redirect({ to: "/auth", search: { mode: "login", redirect: location.href } });
+      throw redirect({
+        to: "/auth",
+        search: { mode: "login", redirect: location.href, email: "" },
+      });
     }
   },
   component: () => (

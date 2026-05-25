@@ -2,7 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { Upload, Scale, Activity, Droplets, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState, useCallback, useEffect } from "react";
@@ -23,14 +31,21 @@ function Inbody() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const fetchReports = async () => {
-    const res = await fetch('/api/inbody', { credentials: 'include' });
+  const fetchReports = useCallback(async () => {
+    const res = await fetch("/api/inbody", { credentials: "include" });
     if (!res.ok) return [];
     return res.json();
-  };
+  }, []);
 
-  const saveReport = async (payload: { data: { reportDate: string; weightKg: number; muscleMassKg: number; bodyFatPercent: number } }) => {
-    await fetch('/api/inbody', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload.data) });
+  const saveReport = async (payload: {
+    data: { reportDate: string; weightKg: number; muscleMassKg: number; bodyFatPercent: number };
+  }) => {
+    await fetch("/api/inbody", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload.data),
+    });
   };
 
   const load = useCallback(async () => {
@@ -38,14 +53,20 @@ function Inbody() {
       const data = await fetchReports();
       setReports(data);
       if (data.length > 0) {
-        setStats({ weight: data[0].weightKg, muscle: data[0].muscleMassKg, fat: data[0].bodyFatPercent });
+        setStats({
+          weight: data[0].weightKg,
+          muscle: data[0].muscleMassKg,
+          fat: data[0].bodyFatPercent,
+        });
       }
     } catch {
-       toast.error("Failed to load history");
+      toast.error("Failed to load history");
     }
   }, [fetchReports]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -58,7 +79,7 @@ function Inbody() {
           weightKg: Number(fd.get("weight")),
           muscleMassKg: Number(fd.get("muscle")),
           bodyFatPercent: Number(fd.get("fat")),
-        }
+        },
       });
       toast.success("Saved successfully");
       setOpen(false);
@@ -74,7 +95,7 @@ function Inbody() {
     <div className="mx-auto max-w-4xl p-4 md:p-8 pb-24 md:pb-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <PageHeader title="InBody Reports" description="Track your body composition over time" />
-        
+
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300 gap-2 mb-2 md:mb-0 w-full md:w-auto">
@@ -91,20 +112,54 @@ function Inbody() {
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="weight" className="text-right text-slate-300">Weight (kg)</Label>
-                  <Input id="weight" name="weight" type="number" step="0.1" defaultValue={stats.weight} className="col-span-3 bg-white/5 border-white/10" required />
+                  <Label htmlFor="weight" className="text-right text-slate-300">
+                    Weight (kg)
+                  </Label>
+                  <Input
+                    id="weight"
+                    name="weight"
+                    type="number"
+                    step="0.1"
+                    defaultValue={stats.weight}
+                    className="col-span-3 bg-white/5 border-white/10"
+                    required
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="muscle" className="text-right text-slate-300">SMM (kg)</Label>
-                  <Input id="muscle" name="muscle" type="number" step="0.1" defaultValue={stats.muscle} className="col-span-3 bg-white/5 border-white/10" required />
+                  <Label htmlFor="muscle" className="text-right text-slate-300">
+                    SMM (kg)
+                  </Label>
+                  <Input
+                    id="muscle"
+                    name="muscle"
+                    type="number"
+                    step="0.1"
+                    defaultValue={stats.muscle}
+                    className="col-span-3 bg-white/5 border-white/10"
+                    required
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="fat" className="text-right text-slate-300">PBF (%)</Label>
-                  <Input id="fat" name="fat" type="number" step="0.1" defaultValue={stats.fat} className="col-span-3 bg-white/5 border-white/10" required />
+                  <Label htmlFor="fat" className="text-right text-slate-300">
+                    PBF (%)
+                  </Label>
+                  <Input
+                    id="fat"
+                    name="fat"
+                    type="number"
+                    step="0.1"
+                    defaultValue={stats.fat}
+                    className="col-span-3 bg-white/5 border-white/10"
+                    required
+                  />
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={busy} className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+                >
                   {busy && <Loader2 className="size-4 mr-2 animate-spin" />}
                   Save changes
                 </Button>
@@ -156,28 +211,38 @@ function Inbody() {
       </div>
 
       <div className="mt-10 rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-4 md:p-6 animate-fade-in flex flex-col items-center">
-        <h3 className="text-lg font-semibold text-slate-200 mb-6 self-start w-full border-b border-white/10 pb-4">Detailed History</h3>
-        
+        <h3 className="text-lg font-semibold text-slate-200 mb-6 self-start w-full border-b border-white/10 pb-4">
+          Detailed History
+        </h3>
+
         {reports.length === 0 ? (
           <div className="text-center py-10 w-full relative overflow-hidden flex flex-col justify-center items-center">
-             <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)]" />
-             <div className="relative z-10 flex flex-col items-center">
-               <div className="size-16 rounded-full bg-slate-800/80 border border-white/10 flex items-center justify-center mb-4">
-                 <Scale className="size-8 text-slate-400" />
-               </div>
-               <p className="text-slate-400 text-sm text-center max-w-sm mb-6">Upload minimum 1 InBody report to unlock the detailed history graph and AI predictive analysis.</p>
-             </div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)]" />
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="size-16 rounded-full bg-slate-800/80 border border-white/10 flex items-center justify-center mb-4">
+                <Scale className="size-8 text-slate-400" />
+              </div>
+              <p className="text-slate-400 text-sm text-center max-w-sm mb-6">
+                Upload minimum 1 InBody report to unlock the detailed history graph and AI
+                predictive analysis.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="w-full space-y-3">
-             {reports.map((r) => (
-                <div key={r.id} className="flex justify-between items-center rounded-xl bg-white/5 border border-white/10 p-4">
-                  <div>
-                    <div className="font-semibold text-slate-200">{formatDate(r.reportDate)}</div>
-                    <div className="text-xs text-slate-400 mt-1">Weight: {r.weightKg}kg • SMM: {r.muscleMassKg}kg • Fat: {r.bodyFatPercent}%</div>
+            {reports.map((r) => (
+              <div
+                key={r.id}
+                className="flex justify-between items-center rounded-xl bg-white/5 border border-white/10 p-4"
+              >
+                <div>
+                  <div className="font-semibold text-slate-200">{formatDate(r.reportDate)}</div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Weight: {r.weightKg}kg • SMM: {r.muscleMassKg}kg • Fat: {r.bodyFatPercent}%
                   </div>
                 </div>
-             ))}
+              </div>
+            ))}
           </div>
         )}
       </div>

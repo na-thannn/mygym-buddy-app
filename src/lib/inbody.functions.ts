@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import logDevError from '@/lib/error-logger';
+import logDevError from "@/lib/error-logger";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 
@@ -25,26 +25,27 @@ export const saveInbodyReport = createServerFn({ method: "POST" })
     const session = await requireSession();
     const { db, schema } = await import("@/server/db");
     const { newId } = await import("@/server/auth");
-    
+
     const id = newId();
     try {
-      db.insert(schema.inbodyReports).values({ id, userId: session.userId, ...data }).run();
+      db.insert(schema.inbodyReports)
+        .values({ id, userId: session.userId, ...data })
+        .run();
       return { ok: true, id };
-    } catch (err: any) {
+    } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
-      throw new Response('Server error', { status: 500 });
+      throw new Response("Server error", { status: 500 });
     }
   });
 
-export const listInbodyReports = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const session = await requireSession();
-    const { db, schema } = await import("@/server/db");
-    
-    return db
-      .select()
-      .from(schema.inbodyReports)
-      .where(eq(schema.inbodyReports.userId, session.userId))
-      .orderBy(desc(schema.inbodyReports.reportDate))
-      .all();
-  });
+export const listInbodyReports = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await requireSession();
+  const { db, schema } = await import("@/server/db");
+
+  return db
+    .select()
+    .from(schema.inbodyReports)
+    .where(eq(schema.inbodyReports.userId, session.userId))
+    .orderBy(desc(schema.inbodyReports.reportDate))
+    .all();
+});

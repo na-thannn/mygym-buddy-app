@@ -1,5 +1,5 @@
 import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
-import logDevError from '@/lib/error-logger';
+import logDevError from "@/lib/error-logger";
 import { sha256 } from "@oslojs/crypto/sha2";
 import { encodeBase32LowerCaseNoPadding, encodeHexLowerCase } from "@oslojs/encoding";
 import { eq } from "drizzle-orm";
@@ -42,9 +42,9 @@ export function createSession(userId: string): { token: string; expiresAt: numbe
   try {
     db.insert(schema.sessions).values({ id: sessionId, userId, expiresAt }).run();
     return { token, expiresAt };
-  } catch (err: any) {
+  } catch (err) {
     logDevError({ error: err, req: null }).catch(() => {});
-    throw new Error('Failed to create session');
+    throw new Error("Failed to create session");
   }
 }
 
@@ -100,7 +100,9 @@ export const requireAuth = createMiddleware({ type: "function" }).server(async (
   if (!token) throw new Response("Unauthorized", { status: 401 });
   const session = validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
-  return next({ context: { userId: session.userId, email: session.email, displayName: session.displayName } });
+  return next({
+    context: { userId: session.userId, email: session.email, displayName: session.displayName },
+  });
 });
 
 export function newId(): string {

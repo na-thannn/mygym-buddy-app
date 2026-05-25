@@ -1,7 +1,8 @@
-import { promises as fs } from 'fs';
-import { dirname } from 'path';
+import { promises as fs } from "fs";
+import { dirname } from "path";
+import type { DevReqSnapshot } from "@/types/dev";
 
-const LOG_PATH = 'logs/dev-errors.log';
+const LOG_PATH = "logs/dev-errors.log";
 
 async function ensureDir(path: string) {
   try {
@@ -21,7 +22,7 @@ function serializeError(error: unknown) {
   }
 }
 
-export async function logDevError(payload: { error: unknown; req?: { method?: string; url?: string; headers?: Record<string, string> } | null }) {
+export async function logDevError(payload: { error: unknown; req?: DevReqSnapshot | null }) {
   try {
     await ensureDir(LOG_PATH);
     const p = {
@@ -29,10 +30,10 @@ export async function logDevError(payload: { error: unknown; req?: { method?: st
       error: serializeError(payload.error),
       req: payload.req ?? null,
     };
-    await fs.appendFile(LOG_PATH, JSON.stringify(p) + '\n', 'utf8');
+    await fs.appendFile(LOG_PATH, JSON.stringify(p) + "\n", "utf8");
   } catch (e) {
     // best effort
-    console.error('Failed to write dev error log', e);
+    console.error("Failed to write dev error log", e);
   }
 }
 

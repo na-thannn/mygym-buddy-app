@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import logDevError from '@/lib/error-logger';
+import logDevError from "@/lib/error-logger";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { generateObject } from "ai";
@@ -64,7 +64,8 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
     const session = await requireSession();
     const { db, schema } = await import("@/server/db");
     const { newId } = await import("@/server/auth");
-    let macros: { calories: number; protein_g: number; carbs_g: number; fats_g: number } | null = null;
+    let macros: { calories: number; protein_g: number; carbs_g: number; fats_g: number } | null =
+      null;
     if (data.estimateMacros) {
       try {
         macros = await estimateMacrosForMeals(data);
@@ -74,39 +75,40 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
     }
     const id = newId();
     try {
-      db.insert(schema.nutritionReports).values({
-        id,
-        userId: session.userId,
-        reportDate: data.reportDate,
-        breakfast: data.breakfast ?? null,
-        lunch: data.lunch ?? null,
-        dinner: data.dinner ?? null,
-        snacks: data.snacks ?? null,
-        dayType: data.dayType ?? null,
-        preWorkoutMeal: data.preWorkoutMeal ?? null,
-        postWorkoutMeal: data.postWorkoutMeal ?? null,
-        notes: data.notes ?? null,
-        calories: macros?.calories ?? null,
-        proteinG: macros?.protein_g ?? null,
-        carbsG: macros?.carbs_g ?? null,
-        fatsG: macros?.fats_g ?? null,
-      }).run();
+      db.insert(schema.nutritionReports)
+        .values({
+          id,
+          userId: session.userId,
+          reportDate: data.reportDate,
+          breakfast: data.breakfast ?? null,
+          lunch: data.lunch ?? null,
+          dinner: data.dinner ?? null,
+          snacks: data.snacks ?? null,
+          dayType: data.dayType ?? null,
+          preWorkoutMeal: data.preWorkoutMeal ?? null,
+          postWorkoutMeal: data.postWorkoutMeal ?? null,
+          notes: data.notes ?? null,
+          calories: macros?.calories ?? null,
+          proteinG: macros?.protein_g ?? null,
+          carbsG: macros?.carbs_g ?? null,
+          fatsG: macros?.fats_g ?? null,
+        })
+        .run();
       return { ok: true, id, macros };
-    } catch (err: any) {
+    } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
-      throw new Response('Server error', { status: 500 });
+      throw new Response("Server error", { status: 500 });
     }
   });
 
-export const listNutritionReports = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const session = await requireSession();
-    const { db, schema } = await import("@/server/db");
-    return db
-      .select()
-      .from(schema.nutritionReports)
-      .where(eq(schema.nutritionReports.userId, session.userId))
-      .orderBy(desc(schema.nutritionReports.reportDate))
-      .limit(50)
-      .all();
-  });
+export const listNutritionReports = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await requireSession();
+  const { db, schema } = await import("@/server/db");
+  return db
+    .select()
+    .from(schema.nutritionReports)
+    .where(eq(schema.nutritionReports.userId, session.userId))
+    .orderBy(desc(schema.nutritionReports.reportDate))
+    .limit(50)
+    .all();
+});

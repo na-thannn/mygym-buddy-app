@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
+import logDevError from "@/lib/error-logger";
 
 async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
@@ -13,6 +14,7 @@ async function requireSession() {
 
 const inputSchema = z.object({
   imageBase64: z.string().min(1),
+  notes: z.string().optional(),
 });
 
 export const addProgressPhoto = createServerFn({ method: "POST" })
@@ -21,27 +23,28 @@ export const addProgressPhoto = createServerFn({ method: "POST" })
     const session = await requireSession();
     const { db, schema } = await import("@/server/db");
     const { newId } = await import("@/server/auth");
-    
-      const id = newId();
-      try {
-        db.insert(schema.progressPhotos).values({ id, userId: session.userId, imageBase64: data.imageBase64, notes: data.notes ?? null }).run();
-        return { ok: true, id };
-      } catch (err: any) {
-        await logDevError({ error: err, req: null }).catch(() => {});
-        throw new Response('Server error', { status: 500 });
-      }
+
+    const id = newId();
+    try {
+      db.insert(schema.progressPhotos)
+        .values({ id, userId: session.userId, imageBase64: data.imageBase64 })
+        .run();
+      return { ok: true, id };
+    } catch (err) {
+      await logDevError({ error: err, req: null }).catch(() => {});
+      throw new Response("Server error", { status: 500 });
+    }
   });
 
-export const listProgressPhotos = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const session = await requireSession();
-    const { db, schema } = await import("@/server/db");
-    
-    return db
-      .select()
-      .from(schema.progressPhotos)
-      .where(eq(schema.progressPhotos.userId, session.userId))
-      .orderBy(desc(schema.progressPhotos.createdAt))
-      .limit(20)
-      .all();
-  });
+export const listProgressPhotos = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await requireSession();
+  const { db, schema } = await import("@/server/db");
+
+  return db
+    .select()
+    .from(schema.progressPhotos)
+    .where(eq(schema.progressPhotos.userId, session.userId))
+    .orderBy(desc(schema.progressPhotos.createdAt))
+    .limit(20)
+    .all();
+});

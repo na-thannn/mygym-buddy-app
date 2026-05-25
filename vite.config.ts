@@ -17,7 +17,9 @@ export default defineConfig({
     resolve: {
       alias: {
         // shim node:async_hooks in the browser to prevent Vite externalization runtime errors
-        "node:async_hooks": fileURLToPath(new URL("./src/shims/async_hooks_shim.js", import.meta.url)),
+        "node:async_hooks": fileURLToPath(
+          new URL("./src/shims/async_hooks_shim.js", import.meta.url),
+        ),
       },
     },
   },

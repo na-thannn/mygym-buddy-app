@@ -1,10 +1,21 @@
 import "./lib/error-capture";
-import logDevError from './lib/error-logger';
-import { appendFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import logDevError from "./lib/error-logger";
+import { appendFileSync, mkdirSync } from "fs";
+import { dirname } from "path";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+
+function safeTypeOf(obj: unknown, key: string): string {
+  try {
+    if (!obj || typeof obj !== "object") return "undefined";
+    const rec = obj as Record<string, unknown>;
+    const v = rec[key];
+    return typeof v;
+  } catch {
+    return "unknown";
+  }
+}
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -15,7 +26,7 @@ let serverEntryPromise: Promise<ServerEntry> | undefined;
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
     serverEntryPromise = import("@tanstack/react-start/server-entry").then(
-      (m) => ((m as { default?: ServerEntry }).default ?? (m as unknown as ServerEntry)),
+      (m) => (m as { default?: ServerEntry }).default ?? (m as unknown as ServerEntry),
     );
   }
   return serverEntryPromise;
@@ -65,7 +76,10 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
     return response;
   }
 
-  await logDevError({ error: consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`), req: null }).catch(() => {});
+  await logDevError({
+    error: consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`),
+    req: null,
+  }).catch(() => {});
   return brandedErrorResponse();
 }
 
@@ -75,31 +89,100 @@ export default {
       try {
         // Synchronous debug snapshot for problematic POST endpoints to ensure logging
         try {
-          const url = (request as Request).url || '';
-          const method = (request as Request).method || '';
-          if (method === 'POST' && (url.endsWith('/api/signup') || url.endsWith('/api/signin'))) {
-            const logPath = 'logs/req-snapshots.log';
+          const url = (request as Request).url || "";
+          const method = (request as Request).method || "";
+          if (method === "POST" && (url.endsWith("/api/signup") || url.endsWith("/api/signin"))) {
+            const logPath = "logs/req-snapshots.log";
             try {
               mkdirSync(dirname(logPath), { recursive: true });
             } catch {}
-            const runtimeObj = (request as any).runtime;
+            const runtimeObj = (request as unknown as Record<string, unknown>)?.runtime;
+            const inner = (request as unknown as Record<string, unknown>).request;
+            const runtimeNode =
+              runtimeObj && typeof runtimeObj === "object"
+                ? (runtimeObj as Record<string, unknown>).node
+                : undefined;
+            const runtimeNodeReq =
+              runtimeNode && typeof runtimeNode === "object"
+                ? (runtimeNode as Record<string, unknown>).req
+                : undefined;
+
+            const innerKeys =
+              inner && typeof inner === "object"
+                ? Object.keys(inner as Record<string, unknown>).slice(0, 50)
+                : undefined;
+            const runtimeKeys =
+              runtimeObj && typeof runtimeObj === "object"
+                ? Object.keys(runtimeObj as Record<string, unknown>).slice(0, 50)
+                : undefined;
+            const runtimeSnapshot =
+              runtimeObj && typeof runtimeObj === "object"
+                ? Object.keys(runtimeObj as Record<string, unknown>).reduce(
+                    (acc: Record<string, string>, k: string) => {
+                      try {
+                        acc[k] = safeTypeOf(runtimeObj, k);
+                      } catch {}
+                      return acc;
+                    },
+                    {},
+                  )
+                : undefined;
+
+            const runtimeNodeKeys =
+              runtimeNode && typeof runtimeNode === "object"
+                ? Object.keys(runtimeNode as Record<string, unknown>).slice(0, 50)
+                : undefined;
+            const runtimeNodeSnapshot =
+              runtimeNode && typeof runtimeNode === "object"
+                ? Object.keys(runtimeNode as Record<string, unknown>).reduce(
+                    (acc: Record<string, string>, k: string) => {
+                      try {
+                        acc[k] = safeTypeOf(runtimeNode, k);
+                      } catch {}
+                      return acc;
+                    },
+                    {},
+                  )
+                : undefined;
+
+            const runtimeNodeReqKeys =
+              runtimeNodeReq && typeof runtimeNodeReq === "object"
+                ? Object.keys(runtimeNodeReq as Record<string, unknown>).slice(0, 50)
+                : undefined;
+            const runtimeNodeReqSnapshot =
+              runtimeNodeReq && typeof runtimeNodeReq === "object"
+                ? Object.keys(runtimeNodeReq as Record<string, unknown>).reduce(
+                    (acc: Record<string, string>, k: string) => {
+                      try {
+                        acc[k] = safeTypeOf(runtimeNodeReq, k);
+                      } catch {}
+                      return acc;
+                    },
+                    {},
+                  )
+                : undefined;
+
             const snapshot = {
               ts: new Date().toISOString(),
               url,
               method,
-              headers: Object.fromEntries((request as Request).headers ? Array.from((request as Request).headers.entries()) : []),
-              keys: Object.keys(request as any).slice(0, 50),
-              hasInner: !!(request as any).request,
-              innerKeys: (request as any).request ? Object.keys((request as any).request).slice(0, 50) : undefined,
-              runtimeKeys: runtimeObj ? Object.keys(runtimeObj).slice(0, 50) : undefined,
-              runtimeSnapshot: runtimeObj && typeof runtimeObj === 'object' ? Object.keys(runtimeObj).reduce((acc: any, k: string) => { try { acc[k] = typeof (runtimeObj as any)[k]; } catch {} return acc; }, {}) : undefined,
-              runtimeNodeKeys: runtimeObj && runtimeObj.node ? Object.keys(runtimeObj.node).slice(0,50) : undefined,
-              runtimeNodeSnapshot: runtimeObj && runtimeObj.node && typeof runtimeObj.node === 'object' ? Object.keys(runtimeObj.node).reduce((acc: any, k: string) => { try { acc[k] = typeof (runtimeObj.node as any)[k]; } catch {} return acc; }, {}) : undefined,
-              runtimeNodeReqKeys: runtimeObj && runtimeObj.node && runtimeObj.node.req ? Object.keys(runtimeObj.node.req).slice(0,50) : undefined,
-              runtimeNodeReqSnapshot: runtimeObj && runtimeObj.node && runtimeObj.node.req && typeof runtimeObj.node.req === 'object' ? Object.keys(runtimeObj.node.req).reduce((acc: any, k: string) => { try { acc[k] = typeof (runtimeObj.node.req as any)[k]; } catch {} return acc; }, {}) : undefined,
+              headers: Object.fromEntries(
+                (request as Request).headers
+                  ? Array.from((request as Request).headers.entries())
+                  : [],
+              ),
+              keys: Object.keys(request as unknown as Record<string, unknown>).slice(0, 50),
+              hasInner: !!inner,
+              innerKeys,
+              runtimeKeys,
+              runtimeSnapshot,
+              runtimeNodeKeys,
+              runtimeNodeSnapshot,
+              runtimeNodeReqKeys,
+              runtimeNodeReqSnapshot,
             };
             try {
-              appendFileSync(logPath, JSON.stringify(snapshot) + '\n', 'utf8');
+              appendFileSync(logPath, JSON.stringify(snapshot) + "\n", "utf8");
             } catch (e) {
               // best-effort
             }
@@ -113,16 +196,16 @@ export default {
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
-        if (typeof process !== 'undefined' && process?.versions?.node) {
-          try {
-            const logger = await import('./lib/error-logger');
-            const reqInfo = { method: (request as Request).method, url: (request as Request).url };
-            await logger.logDevError({ error, req: reqInfo }).catch(() => {});
-          } catch (e) {
-            console.error('Failed to persist server error', e);
-          }
+      if (typeof process !== "undefined" && process?.versions?.node) {
+        try {
+          const logger = await import("./lib/error-logger");
+          const reqInfo = { method: (request as Request).method, url: (request as Request).url };
+          await logger.logDevError({ error, req: reqInfo }).catch(() => {});
+        } catch (e) {
+          console.error("Failed to persist server error", e);
         }
-        return brandedErrorResponse();
+      }
+      return brandedErrorResponse();
     }
   },
 };
