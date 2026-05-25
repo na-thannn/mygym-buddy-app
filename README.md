@@ -32,9 +32,9 @@ boot. To reset everything, delete that file.
 
 ## Notes
 
-- This project replaced the original Supabase + Lovable Cloud setup
-  with a fully local stack so it can be demonstrated on a laptop
-  without external services besides the Groq API.
-- The Lovable in-browser preview will not work because `better-sqlite3`
+- This project replaced the original Supabase cloud setup with a fully
+  local stack so it can be demonstrated on a laptop without external
+  services besides the Groq API.
+- Note: the in-browser cloud preview will not work because `better-sqlite3`
   is a native Node addon and cannot run in the Cloudflare Worker SSR
   runtime — run locally with `npm run dev`.
