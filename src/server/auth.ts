@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { createMiddleware } from "@tanstack/react-start";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { db, schema } from "./db";
+import { hasAnyRole, normalizeRole, type AppRole } from "@/lib/roles";
 
 const SESSION_COOKIE = "alex_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -48,7 +49,14 @@ export function createSession(userId: string): { token: string; expiresAt: numbe
   }
 }
 
-export function validateSessionToken(token: string) {
+export type AuthSession = {
+  userId: string;
+  email: string;
+  displayName: string;
+  role: AppRole;
+};
+
+export function validateSessionToken(token: string): AuthSession | null {
   const sessionId = hashSessionToken(token);
   const row = db
     .select({
@@ -57,6 +65,7 @@ export function validateSessionToken(token: string) {
       expiresAt: schema.sessions.expiresAt,
       email: schema.users.email,
       displayName: schema.users.displayName,
+      role: schema.users.role,
     })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
@@ -68,7 +77,12 @@ export function validateSessionToken(token: string) {
     db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId)).run();
     return null;
   }
-  return { userId: row.userId, email: row.email, displayName: row.displayName };
+  return {
+    userId: row.userId,
+    email: row.email,
+    displayName: row.displayName,
+    role: normalizeRole(row.role),
+  };
 }
 
 export function invalidateSessionToken(token: string) {
@@ -94,6 +108,23 @@ export function readSessionCookie(): string | undefined {
   return getCookie(SESSION_COOKIE);
 }
 
+export function getSessionUser(): AuthSession | null {
+  const token = readSessionCookie();
+  return token ? validateSessionToken(token) : null;
+}
+
+export function requireSessionUser(): AuthSession {
+  const session = getSessionUser();
+  if (!session) throw new Response("Unauthorized", { status: 401 });
+  return session;
+}
+
+export function requireRole(roles: readonly AppRole[]): AuthSession {
+  const session = requireSessionUser();
+  if (!hasAnyRole(session, roles)) throw new Response("Forbidden", { status: 403 });
+  return session;
+}
+
 // Server-fn middleware: rejects unauthenticated requests, injects user context.
 export const requireAuth = createMiddleware({ type: "function" }).server(async ({ next }) => {
   const token = readSessionCookie();
@@ -101,7 +132,12 @@ export const requireAuth = createMiddleware({ type: "function" }).server(async (
   const session = validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return next({
-    context: { userId: session.userId, email: session.email, displayName: session.displayName },
+    context: {
+      userId: session.userId,
+      email: session.email,
+      displayName: session.displayName,
+      role: session.role,
+    },
   });
 });
 

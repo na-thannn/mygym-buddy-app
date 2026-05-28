@@ -16,6 +16,16 @@ dist-ssr
 .nitro
 *.local
 
+# Local runtime data
+data/*.db
+data/*.db-shm
+data/*.db-wal
+cookies.txt
+
+# Understand Anything generated output
+.understand-anything/*
+!.understand-anything/.understandignore
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

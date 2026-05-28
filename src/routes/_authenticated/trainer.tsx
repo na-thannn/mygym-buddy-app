@@ -4,11 +4,22 @@ import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronDown, ChevronRight, Loader2, Send, Sparkles, Wrench } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Headphones,
+  Loader2,
+  Send,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/trainer")({
   head: () => ({ meta: [{ title: "AI Coach — HL Fitness" }] }),
@@ -25,6 +36,10 @@ const SUGGESTIONS = [
 
 function TrainerPage() {
   const [input, setInput] = useState("");
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportSubject, setSupportSubject] = useState("");
+  const [supportMessage, setSupportMessage] = useState("");
+  const [supportBusy, setSupportBusy] = useState(false);
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
   });
@@ -46,12 +61,85 @@ function TrainerPage() {
     setInput("");
   };
 
+  const submitSupport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSupportBusy(true);
+    try {
+      const res = await fetch("/api/support", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          subject: supportSubject,
+          message: supportMessage,
+          source: "ai_chat",
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Unable to request support");
+      toast.success("Support request sent");
+      setSupportSubject("");
+      setSupportMessage("");
+      setSupportOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to request support");
+    } finally {
+      setSupportBusy(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 pt-4 pb-6 flex flex-col h-[100dvh] md:h-screen">
       <PageHeader
         title="Chat with AI Coach"
         subtitle="Your AI trainer for plans, logs, and progress analysis."
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            className="shrink-0"
+            onClick={() => setSupportOpen((value) => !value)}
+          >
+            <Headphones className="mr-2 size-4" />
+            Human support
+          </Button>
+        }
       />
+
+      {supportOpen && (
+        <form
+          onSubmit={submitSupport}
+          className="mb-3 rounded-2xl border border-white/10 bg-black/40 p-4"
+        >
+          <div className="grid gap-3 md:grid-cols-[0.8fr,1.2fr,auto] md:items-end">
+            <div className="space-y-1">
+              <Label>Subject</Label>
+              <Input
+                value={supportSubject}
+                onChange={(e) => setSupportSubject(e.target.value)}
+                placeholder="Booking or coaching issue"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Message</Label>
+              <Input
+                value={supportMessage}
+                onChange={(e) => setSupportMessage(e.target.value)}
+                placeholder="What do you need help with?"
+                required
+              />
+            </div>
+            <Button
+              disabled={supportBusy || !supportSubject.trim() || !supportMessage.trim()}
+              className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+            >
+              {supportBusy && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Send
+            </Button>
+          </div>
+        </form>
+      )}
 
       <div
         ref={scrollRef}

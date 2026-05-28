@@ -20,6 +20,11 @@ export const signUp = createServerFn({ method: "POST" })
       .where(eq(schema.users.email, data.email))
       .get();
     if (existing) throw new Error("Email is already in use");
+    const adminExists = db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.role, "admin"))
+      .get();
     const id = newId();
     try {
       db.insert(schema.users)
@@ -28,6 +33,7 @@ export const signUp = createServerFn({ method: "POST" })
           email: data.email,
           passwordHash: hashPassword(data.password),
           displayName: data.displayName,
+          role: adminExists ? "customer" : "admin",
         })
         .run();
       db.insert(schema.profiles).values({ userId: id }).run();
@@ -74,5 +80,10 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(async ()
   if (!token) return null;
   const session = validateSessionToken(token);
   if (!session) return null;
-  return { id: session.userId, email: session.email, displayName: session.displayName };
+  return {
+    id: session.userId,
+    email: session.email,
+    displayName: session.displayName,
+    role: session.role,
+  };
 });

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { LineChart, Camera, TrendingUp, Calendar, ChevronRight, Loader2 } from "lucide-react";
@@ -16,7 +16,9 @@ type Photo = Awaited<ReturnType<typeof listProgressPhotos>>[number];
 function Progress() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [analysisBusy, setAnalysisBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const fetchPhotos = async () => {
     const res = await fetch("/api/progress-photos", { credentials: "include" });
@@ -77,6 +79,29 @@ function Progress() {
     };
     reader.readAsDataURL(file);
     e.target.value = ""; // reset
+  };
+
+  const handleWeeklyAnalysis = async () => {
+    if (analysisBusy) return;
+    setAnalysisBusy(true);
+    try {
+      const res = await fetch("/api/weekly-analysis", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ days: 7 }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? "Analysis failed");
+      }
+      toast.success("Weekly analysis ready");
+      navigate({ to: "/analyses" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Analysis failed");
+    } finally {
+      setAnalysisBusy(false);
+    }
   };
 
   return (
@@ -167,7 +192,12 @@ function Progress() {
         )}
       </div>
 
-      <div className="mt-10 rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-6 animate-fade-in flex items-center justify-between group cursor-pointer hover:bg-white/5 transition">
+      <button
+        type="button"
+        onClick={handleWeeklyAnalysis}
+        disabled={analysisBusy}
+        className="mt-10 w-full text-left rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-6 animate-fade-in flex items-center justify-between group hover:bg-white/5 transition disabled:opacity-60 disabled:cursor-not-allowed"
+      >
         <div>
           <h3 className="text-lg font-semibold text-slate-200 mb-1">Weekly AI Analysis</h3>
           <p className="text-slate-400 text-sm max-w-sm">
@@ -175,9 +205,13 @@ function Progress() {
           </p>
         </div>
         <div className="size-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10 text-slate-400 group-hover:bg-yellow-400/20 group-hover:text-yellow-400 group-hover:border-yellow-400/30 transition">
-          <ChevronRight className="size-5" />
+          {analysisBusy ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <ChevronRight className="size-5" />
+          )}
         </div>
-      </div>
+      </button>
     </div>
   );
 }

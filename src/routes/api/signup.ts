@@ -11,7 +11,10 @@ const inputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   displayName: z.string().min(1),
+  autoSignIn: z.boolean().optional().default(false),
 });
+
+type SignupInput = z.infer<typeof inputSchema>;
 
 export const Route = createFileRoute("/api/signup")({
   server: {
@@ -70,7 +73,7 @@ export const Route = createFileRoute("/api/signup")({
           });
         }
 
-        let data;
+        let data: SignupInput;
         try {
           data = inputSchema.parse(body as unknown);
         } catch (err: unknown) {
@@ -90,6 +93,11 @@ export const Route = createFileRoute("/api/signup")({
             status: 400,
             headers: { "Content-Type": "application/json" },
           });
+        const adminExists = db
+          .select({ id: schema.users.id })
+          .from(schema.users)
+          .where(eq(schema.users.role, "admin"))
+          .get();
         const id = newId();
         try {
           db.insert(schema.users)
@@ -98,11 +106,15 @@ export const Route = createFileRoute("/api/signup")({
               email: data.email,
               passwordHash: hashPassword(data.password),
               displayName: data.displayName,
+              role: adminExists ? "customer" : "admin",
             })
             .run();
           db.insert(schema.profiles).values({ userId: id }).run();
-          const { token, expiresAt } = createSession(id);
-          setSessionCookie(token, expiresAt);
+          // Only create a session and set the cookie if the client explicitly requested auto sign-in.
+          if (data.autoSignIn === true) {
+            const { token, expiresAt } = createSession(id);
+            setSessionCookie(token, expiresAt);
+          }
           return new Response(
             JSON.stringify({ id, email: data.email, displayName: data.displayName }),
             { status: 201, headers: { "Content-Type": "application/json" } },

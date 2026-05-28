@@ -17,6 +17,10 @@ import {
   Scale,
   PieChart,
   LineChart,
+  Shield,
+  CalendarDays,
+  Headphones,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -27,27 +31,58 @@ import {
   SheetDescription,
   SheetClose,
 } from "@/components/ui/sheet";
+import type { AppRole } from "@/lib/roles";
 
-type NavItem = { to: string; label: string; icon: typeof Activity };
+type NavItem = { to: string; label: string; icon: typeof Activity; roles: AppRole[] };
 
 const NAV: NavItem[] = [
-  { to: "/feed", label: "Feed", icon: Home },
-  { to: "/inbody", label: "InBody", icon: Scale },
-  { to: "/log/workout", label: "Workout", icon: Dumbbell },
-  { to: "/nutrition", label: "Nutrition", icon: PieChart },
-  { to: "/log/nutrition-report", label: "Nutrition Report", icon: FileText },
-  { to: "/progress", label: "Progress", icon: LineChart },
-  { to: "/progress-report", label: "Progress Report", icon: FileText },
-  { to: "/trainer", label: "AI Coach", icon: MessageCircle },
-  { to: "/plans", label: "Plans", icon: ClipboardList },
-  { to: "/analyses", label: "AI Analyses", icon: Sparkles },
-  { to: "/profile", label: "Profile", icon: UserCircle },
+  { to: "/feed", label: "Feed", icon: Home, roles: ["admin", "staff", "pt", "customer"] },
+  { to: "/staff", label: "Staff Ops", icon: Headphones, roles: ["admin", "staff"] },
+  { to: "/pt-inbox", label: "PT Desk", icon: Inbox, roles: ["admin", "pt"] },
+  { to: "/admin", label: "Admin", icon: Shield, roles: ["admin"] },
+  {
+    to: "/classes",
+    label: "Classes",
+    icon: CalendarDays,
+    roles: ["admin", "staff", "pt", "customer"],
+  },
+  {
+    to: "/bookings",
+    label: "Bookings",
+    icon: Activity,
+    roles: ["admin", "staff", "pt", "customer"],
+  },
+  { to: "/inbody", label: "InBody", icon: Scale, roles: ["admin", "customer"] },
+  { to: "/log/workout", label: "Workout", icon: Dumbbell, roles: ["customer"] },
+  { to: "/nutrition", label: "Nutrition", icon: PieChart, roles: ["customer"] },
+  { to: "/progress", label: "Progress", icon: LineChart, roles: ["admin", "customer"] },
+  {
+    to: "/progress-report",
+    label: "Progress Report",
+    icon: FileText,
+    roles: ["admin", "customer"],
+  },
+  { to: "/trainer", label: "AI Coach", icon: MessageCircle, roles: ["customer"] },
+  { to: "/plans", label: "Plans", icon: ClipboardList, roles: ["customer"] },
+  { to: "/analyses", label: "AI Analyses", icon: Sparkles, roles: ["customer"] },
+  {
+    to: "/profile",
+    label: "Profile",
+    icon: UserCircle,
+    roles: ["admin", "staff", "pt", "customer"],
+  },
 ];
+
+function getNavItems(role: AppRole | undefined): NavItem[] {
+  if (!role) return [];
+  return NAV.filter((item) => item.roles.includes(role));
+}
 
 export function AppLayout({ children }: { children?: ReactNode }) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const loc = useLocation();
+  const navItems = getNavItems(user?.role);
 
   const handleSignOut = async () => {
     await signOut();
@@ -97,7 +132,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
               <div className="text-[10px] text-slate-300">with Alex AI</div>
             </div>
           </Link>
-          {NAV.map((it) => {
+          {navItems.map((it) => {
             const active = loc.pathname === it.to || loc.pathname.startsWith(it.to + "/");
             const Icon = it.icon;
             return (
@@ -159,7 +194,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
                 </Link>
 
                 <div className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
-                  {NAV.map((it) => {
+                  {navItems.map((it) => {
                     const active = loc.pathname === it.to || loc.pathname.startsWith(it.to + "/");
                     const Icon = it.icon;
                     return (

@@ -25,6 +25,10 @@ const reportInput = z.object({
   postWorkoutMeal: z.string().max(500).optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   estimateMacros: z.boolean().default(true),
+  calories: z.number().min(0).optional().nullable(),
+  proteinG: z.number().min(0).optional().nullable(),
+  carbsG: z.number().min(0).optional().nullable(),
+  fatsG: z.number().min(0).optional().nullable(),
 });
 
 const macrosSchema = z.object({
@@ -66,6 +70,12 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
     const { newId } = await import("@/server/auth");
     let macros: { calories: number; protein_g: number; carbs_g: number; fats_g: number } | null =
       null;
+    const manualMacros = {
+      calories: data.calories ?? null,
+      proteinG: data.proteinG ?? null,
+      carbsG: data.carbsG ?? null,
+      fatsG: data.fatsG ?? null,
+    };
     if (data.estimateMacros) {
       try {
         macros = await estimateMacrosForMeals(data);
@@ -73,6 +83,12 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
         await logDevError({ error: e, req: null }).catch(() => {});
       }
     }
+    const resolvedMacros = {
+      calories: macros?.calories ?? manualMacros.calories,
+      proteinG: macros?.protein_g ?? manualMacros.proteinG,
+      carbsG: macros?.carbs_g ?? manualMacros.carbsG,
+      fatsG: macros?.fats_g ?? manualMacros.fatsG,
+    };
     const id = newId();
     try {
       db.insert(schema.nutritionReports)
@@ -88,13 +104,14 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
           preWorkoutMeal: data.preWorkoutMeal ?? null,
           postWorkoutMeal: data.postWorkoutMeal ?? null,
           notes: data.notes ?? null,
-          calories: macros?.calories ?? null,
-          proteinG: macros?.protein_g ?? null,
-          carbsG: macros?.carbs_g ?? null,
-          fatsG: macros?.fats_g ?? null,
+          calories: resolvedMacros.calories ?? null,
+          proteinG: resolvedMacros.proteinG ?? null,
+          carbsG: resolvedMacros.carbsG ?? null,
+          fatsG: resolvedMacros.fatsG ?? null,
         })
         .run();
-      return { ok: true, id, macros };
+      const hasMacros = Object.values(resolvedMacros).some((v) => typeof v === "number");
+      return { ok: true, id, macros: hasMacros ? resolvedMacros : null };
     } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
       throw new Response("Server error", { status: 500 });

@@ -249,5 +249,27 @@ Return ONLY the Markdown plan, no preamble.`;
         return { ok: true, id };
       },
     }),
+
+    create_support_ticket: tool({
+      description:
+        "Create a human support ticket when the user asks for staff/PT help, reports a booking issue, or needs a human to follow up. Ask for a short subject and issue summary first if missing.",
+      inputSchema: z.object({
+        subject: z.string().min(3).max(120),
+        message: z.string().min(5).max(2000),
+      }),
+      execute: async ({ subject, message }) => {
+        const id = newId();
+        db.insert(schema.supportTickets)
+          .values({
+            id,
+            customerId: userId,
+            subject,
+            message,
+            source: "ai_chat",
+          })
+          .run();
+        return { ok: true, id };
+      },
+    }),
   };
 }

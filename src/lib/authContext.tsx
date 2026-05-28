@@ -1,6 +1,12 @@
 import { createContext, useContext, type ReactNode } from "react";
+import type { AppRole } from "./roles";
 
-export type AppUser = { id: string; email: string; displayName: string };
+export type AppUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: AppRole;
+};
 
 interface AuthCtx {
   user: AppUser | null;

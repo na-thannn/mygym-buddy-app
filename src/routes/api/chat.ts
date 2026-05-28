@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
-import { readSessionCookie, validateSessionToken } from "@/server/auth";
+import { getSessionUser } from "@/server/auth";
 import { getGroq, ALEX_MODEL_ID } from "@/lib/trainer/groq";
 import { buildAlexTools } from "@/lib/trainer/tools";
 import { parseRequestBody } from "@/lib/request-utils";
@@ -17,6 +17,7 @@ Topics you handle (each maps to tools):
 5. Weekly progress reports — log_progress_report.
 6. Progress analysis — call get_plan_for_date + get_workouts_since, then analyze_progress.
 7. Motivation, rest-day advice, general Q&A — answer directly.
+8. Human support escalation — if the user asks for staff/PT help or says the AI did not solve their issue, collect a short subject and summary, then call create_support_ticket.
 
 RULES:
 - Ask the user one focused question at a time during data collection.
@@ -29,8 +30,7 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = getSessionUser();
         if (!session) return new Response("Unauthorized", { status: 401 });
         const body: unknown = await parseRequestBody(request as unknown);
         const bodyObj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};

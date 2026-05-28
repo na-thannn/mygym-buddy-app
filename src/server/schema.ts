@@ -6,6 +6,8 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
+  role: text("role").notNull().default("customer"),
+  assignedPtId: text("assigned_pt_id"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
@@ -88,6 +90,98 @@ export const progressReports = sqliteTable("progress_reports", {
   totalVolume: real("total_volume").default(0),
   notes: text("notes"),
   createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const bookings = sqliteTable("bookings", {
+  id: text("id").primaryKey(),
+  customerId: text("customer_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  ptId: text("pt_id").references(() => users.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("pending"),
+  scheduledAt: text("scheduled_at").notNull(),
+  durationMinutes: integer("duration_minutes").notNull().default(60),
+  notes: text("notes"),
+  cancelledBy: text("cancelled_by"),
+  cancellationReason: text("cancellation_reason"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const supportTickets = sqliteTable("support_tickets", {
+  id: text("id").primaryKey(),
+  customerId: text("customer_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  source: text("source").notNull().default("customer"),
+  status: text("status").notNull().default("open"),
+  assignedStaffId: text("assigned_staff_id").references(() => users.id, { onDelete: "set null" }),
+  assignedPtId: text("assigned_pt_id").references(() => users.id, { onDelete: "set null" }),
+  resolutionNotes: text("resolution_notes"),
+  resolvedAt: text("resolved_at"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const groupClasses = sqliteTable("group_classes", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  level: text("level"),
+  active: integer("active").notNull().default(1),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const groupClassSessions = sqliteTable("group_class_sessions", {
+  id: text("id").primaryKey(),
+  classId: text("class_id")
+    .notNull()
+    .references(() => groupClasses.id, { onDelete: "cascade" }),
+  trainerId: text("trainer_id").references(() => users.id, { onDelete: "set null" }),
+  startsAt: text("starts_at").notNull(),
+  durationMinutes: integer("duration_minutes").notNull().default(60),
+  capacity: integer("capacity").notNull().default(12),
+  status: text("status").notNull().default("scheduled"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const groupClassBookings = sqliteTable("group_class_bookings", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id")
+    .notNull()
+    .references(() => groupClassSessions.id, { onDelete: "cascade" }),
+  customerId: text("customer_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("booked"),
+  attendedAt: text("attended_at"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
 });

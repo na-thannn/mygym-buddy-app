@@ -1,0 +1,44 @@
+# Understand Anything analysis excludes.
+# Keep this focused on generated, local, and noisy files so the graph stays
+# centered on application source and project configuration.
+
+.git/
+node_modules/
+dist/
+dist-ssr/
+.output/
+.vinxi/
+.tanstack/
+.nitro/
+.wrangler/
+coverage/
+logs/
+data/
+
+.env
+.env.*
+*.local
+cookies.txt
+
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+*.log
+*.map
+*.min.js
+*.min.css
+*.zip
+*.tar
+*.gz
+
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
