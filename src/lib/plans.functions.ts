@@ -7,7 +7,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -26,15 +26,15 @@ export const savePlan = createServerFn({ method: "POST" })
     const { newId } = await import("@/server/auth");
     const id = newId();
     try {
-      db.insert(schema.workoutPlanDocs)
+      await db
+        .insert(schema.workoutPlanDocs)
         .values({
           id,
           userId: session.userId,
           planDate: data.planDate,
           title: data.title ?? null,
           contentMd: data.contentMd,
-        })
-        .run();
+        });
       return { ok: true, id };
     } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
@@ -45,13 +45,12 @@ export const savePlan = createServerFn({ method: "POST" })
 export const listPlans = createServerFn({ method: "GET" }).handler(async () => {
   const session = await requireSession();
   const { db, schema } = await import("@/server/db");
-  return db
+  return await db
     .select()
     .from(schema.workoutPlanDocs)
     .where(eq(schema.workoutPlanDocs.userId, session.userId))
     .orderBy(desc(schema.workoutPlanDocs.planDate), desc(schema.workoutPlanDocs.createdAt))
-    .limit(100)
-    .all();
+    .limit(100);
 });
 
 export const getPlanByDate = createServerFn({ method: "GET" })
@@ -59,7 +58,7 @@ export const getPlanByDate = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const session = await requireSession();
     const { db, schema } = await import("@/server/db");
-    return db
+    const [plan] = await db
       .select()
       .from(schema.workoutPlanDocs)
       .where(
@@ -69,5 +68,6 @@ export const getPlanByDate = createServerFn({ method: "GET" })
         ),
       )
       .orderBy(desc(schema.workoutPlanDocs.createdAt))
-      .get();
+      .limit(1);
+    return plan;
   });

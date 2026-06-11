@@ -1,12 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/lib/authContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  MagneticTarget,
+  OptimizedPicture,
+  SpotlightSurface,
+} from "@/components/motion/public-funnel-motion";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -18,10 +23,12 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
+  const reduceMotion = useReducedMotion();
   const { mode, redirect, email } = Route.useSearch();
   const { user, loading, refresh } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+
   const doSignIn = async (payload: { data: { email: string; password: string } }) => {
     const res = await fetch("/api/signin", {
       method: "POST",
@@ -32,22 +39,6 @@ function AuthPage() {
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body?.error ?? "Sign in failed");
-    }
-    return res.json();
-  };
-
-  const doSignUp = async (payload: {
-    data: { email: string; password: string; displayName: string };
-  }) => {
-    const res = await fetch("/api/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(payload.data),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body?.error ?? "Sign up failed");
     }
     return res.json();
   };
@@ -73,140 +64,144 @@ function AuthPage() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    setBusy(true);
-    try {
-      await doSignUp({
-        data: {
-          email: String(fd.get("email") ?? ""),
-          password: String(fd.get("password") ?? ""),
-          displayName: String(fd.get("displayName") ?? ""),
-        },
-      });
-      await refresh();
-      toast.success("Account created");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sign up failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen dark bg-[radial-gradient(circle_at_top,_#1b1f14,_#0f120c_55%,_#090b07_100%)] text-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md animate-scale-in">
-        <Link to="/" className="flex items-center gap-3 justify-center mb-6">
-          <img
-            src="/logo.jpg"
-            alt="Logo"
-            className="size-10 rounded-xl object-cover animate-glow"
-          />
-          <div className="font-semibold tracking-wide">HL Fitness · Alex AI</div>
-        </Link>
-        <div className="rounded-2xl border border-white/10 bg-black/50 backdrop-blur p-6 shadow-xl">
-          <Tabs defaultValue={mode}>
-            <TabsList className="w-full bg-white/10 border border-white/10">
-              <TabsTrigger
-                value="login"
-                className="flex-1 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-950"
-              >
-                Sign in
-              </TabsTrigger>
-              <TabsTrigger
-                value="signup"
-                className="flex-1 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-950"
-              >
-                Sign up
-              </TabsTrigger>
-            </TabsList>
+    <div className="relative min-h-[100dvh] overflow-hidden bg-[#050806] text-stone-50 dark">
+      <div className="absolute inset-0">
+        <OptimizedPicture
+          src="/redesign/community-training.png"
+          alt="HL Fitness members training together"
+          className="opacity-80 saturate-[1.05]"
+          priority
+          sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(103deg,rgba(5,8,6,0.28)_0%,rgba(5,8,6,0.48)_34%,rgba(5,8,6,0.82)_58%,#050806_78%,#050806_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_74%_44%,rgba(244,179,43,0.1),transparent_32%)]" />
+        <div className="funnel-grid absolute inset-0 opacity-15" />
+      </div>
 
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-3 mt-4">
-                <div className="space-y-1">
-                  <Label htmlFor="li-email">Email</Label>
-                  <Input
-                    id="li-email"
-                    name="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    defaultValue={email}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="li-pw">Password</Label>
-                  <Input
-                    id="li-pw"
-                    name="password"
-                    type="password"
-                    required
-                    autoComplete="current-password"
-                  />
-                </div>
+      <main className="relative mx-auto grid min-h-[100dvh] max-w-7xl items-center gap-10 px-4 py-8 sm:px-6 lg:grid-cols-[0.95fr_0.78fr] lg:px-8">
+        <motion.section
+          className="hidden max-w-xl lg:block"
+          initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <BadgeCheck className="mb-5 size-10 text-primary" strokeWidth={1.8} />
+          <h1 className="text-5xl font-semibold leading-[0.98] tracking-tight">
+            Your member tools stay close.
+          </h1>
+          <p className="mt-5 max-w-md text-base leading-7 text-stone-300">
+            Sign in to reach workouts, plans, coach chat, InBody records, and progress reports.
+          </p>
+          <div className="mt-8 grid max-w-md gap-3 border-l border-primary/50 pl-4 text-sm leading-6 text-stone-300">
+            <span>HL Fitness</span>
+            <span>303 Le Thanh Nghi</span>
+          </div>
+        </motion.section>
+
+        <motion.section
+          className="mx-auto w-full max-w-md lg:mr-0"
+          initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.56, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <Link to="/" className="mb-8 flex items-center justify-center gap-3 lg:justify-start">
+            <img src="/logo.jpg" alt="Logo" className="size-10 rounded-lg object-cover" />
+            <div>
+              <div className="text-sm font-semibold tracking-tight">HL Fitness Alex AI</div>
+              <div className="mt-1 text-xs text-stone-500">303 Le Thanh Nghi</div>
+            </div>
+          </Link>
+
+          <SpotlightSurface className="funnel-panel rounded-2xl bg-[#111612] p-5 sm:p-6">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-stone-50">Sign in</h1>
+              <p className="mt-2 text-sm leading-6 text-stone-300">
+                Use the account your coach sent after your HL Fitness meeting.
+              </p>
+            </div>
+
+            {mode === "signup" && (
+              <div className="mt-5 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm leading-6 text-stone-200">
+                Guests cannot create accounts directly. Request a coach meeting first, then your
+                coach can send a login if you join.
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="mt-5 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="li-email" className="text-stone-200">
+                  Email
+                </Label>
+                <Input
+                  id="li-email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  defaultValue={email}
+                  className="h-11 rounded-lg border-white/10 bg-white/[0.06] text-stone-50 placeholder:text-stone-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="li-pw" className="text-stone-200">
+                  Password
+                </Label>
+                <Input
+                  id="li-pw"
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  className="h-11 rounded-lg border-white/10 bg-white/[0.06] text-stone-50"
+                />
+              </div>
+              <MagneticTarget className="w-full">
                 <Button
                   type="submit"
                   disabled={busy}
-                  className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+                  className="h-11 w-full rounded-xl bg-primary text-primary-foreground transition duration-200 hover:bg-primary/90 active:scale-[0.98]"
                 >
-                  {busy && <Loader2 className="size-4 mr-2 animate-spin" />}
+                  {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
                   Sign in
                 </Button>
-              </form>
-            </TabsContent>
+              </MagneticTarget>
+            </form>
 
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-3 mt-4">
-                <div className="space-y-1">
-                  <Label htmlFor="su-name">Display name</Label>
-                  <Input id="su-name" name="displayName" required minLength={1} maxLength={60} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="su-email">Email</Label>
-                  <Input
-                    id="su-email"
-                    name="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    defaultValue={email}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="su-pw">Password</Label>
-                  <Input
-                    id="su-pw"
-                    name="password"
-                    type="password"
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                  />
-                </div>
+            <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="text-sm font-semibold text-stone-50">Need an account?</div>
+              <p className="mt-1 text-xs leading-5 text-stone-400">
+                Request a coach meeting first. If you join, your coach sends your temporary login by
+                email.
+              </p>
+              <MagneticTarget>
                 <Button
-                  type="submit"
-                  disabled={busy}
-                  className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+                  asChild
+                  variant="outline"
+                  className="mt-4 h-10 rounded-xl border-white/15 bg-white/[0.04] text-stone-50 transition duration-200 hover:bg-white/[0.08] active:scale-[0.98]"
                 >
-                  {busy && <Loader2 className="size-4 mr-2 animate-spin" />}
-                  Create account
+                  <Link to="/get-started">
+                    Get started <ArrowRight className="ml-2 size-4" strokeWidth={1.8} />
+                  </Link>
                 </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </div>
+              </MagneticTarget>
+            </div>
+          </SpotlightSurface>
 
-        <div className="text-center mt-6">
-          <Button
-            asChild
-            variant="ghost"
-            className="text-slate-400 hover:text-slate-200 hover:bg-white/5"
-          >
-            <Link to="/">← Back to home</Link>
-          </Button>
-        </div>
-      </div>
+          <div className="mt-6 text-center">
+            <Button
+              asChild
+              variant="ghost"
+              className="rounded-xl text-stone-400 hover:bg-white/[0.06] hover:text-stone-100"
+            >
+              <Link to="/">
+                <ArrowLeft className="mr-2 size-4" strokeWidth={1.8} />
+                Back to home
+              </Link>
+            </Button>
+          </div>
+        </motion.section>
+      </main>
     </div>
   );
 }

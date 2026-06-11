@@ -31,5 +31,5 @@ export function canBookGroupClassSession(state: GroupClassBookingState): boolean
 }
 
 export function canManageGroupClasses(actor: Actor | null | undefined): boolean {
-  return hasAnyRole(actor, ["admin", "staff", "pt"]);
+  return hasAnyRole(actor, ["admin", "manager", "pt"]);
 }

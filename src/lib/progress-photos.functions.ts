@@ -7,7 +7,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -26,9 +26,9 @@ export const addProgressPhoto = createServerFn({ method: "POST" })
 
     const id = newId();
     try {
-      db.insert(schema.progressPhotos)
-        .values({ id, userId: session.userId, imageBase64: data.imageBase64 })
-        .run();
+      await db
+        .insert(schema.progressPhotos)
+        .values({ id, userId: session.userId, imageBase64: data.imageBase64 });
       return { ok: true, id };
     } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
@@ -40,11 +40,10 @@ export const listProgressPhotos = createServerFn({ method: "GET" }).handler(asyn
   const session = await requireSession();
   const { db, schema } = await import("@/server/db");
 
-  return db
+  return await db
     .select()
     .from(schema.progressPhotos)
     .where(eq(schema.progressPhotos.userId, session.userId))
     .orderBy(desc(schema.progressPhotos.createdAt))
-    .limit(20)
-    .all();
+    .limit(20);
 });

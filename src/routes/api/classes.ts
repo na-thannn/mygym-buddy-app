@@ -46,11 +46,11 @@ export const Route = createFileRoute("/api/classes")({
   server: {
     handlers: {
       GET: async () => {
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) return json({ error: "Unauthorized" }, 401);
 
         try {
-          const sessions = db
+          const sessions = await db
             .select({
               sessionId: schema.groupClassSessions.id,
               classId: schema.groupClassSessions.classId,
@@ -69,23 +69,21 @@ export const Route = createFileRoute("/api/classes")({
               eq(schema.groupClassSessions.classId, schema.groupClasses.id),
             )
             .orderBy(desc(schema.groupClassSessions.startsAt))
-            .limit(200)
-            .all();
+            .limit(200);
 
-          const countRows = db
+          const countRows = await db
             .select({
               sessionId: schema.groupClassBookings.sessionId,
               count: sql<number>`count(*)`,
             })
             .from(schema.groupClassBookings)
             .where(eq(schema.groupClassBookings.status, "booked"))
-            .groupBy(schema.groupClassBookings.sessionId)
-            .all();
+            .groupBy(schema.groupClassBookings.sessionId);
           const counts = new Map(countRows.map((row) => [row.sessionId, Number(row.count ?? 0)]));
 
           const myBookings =
             session.role === "customer"
-              ? db
+              ? await db
                   .select({
                     id: schema.groupClassBookings.id,
                     sessionId: schema.groupClassBookings.sessionId,
@@ -93,7 +91,6 @@ export const Route = createFileRoute("/api/classes")({
                   })
                   .from(schema.groupClassBookings)
                   .where(eq(schema.groupClassBookings.customerId, session.userId))
-                  .all()
               : [];
           const mine = new Map(myBookings.map((row) => [row.sessionId, row]));
 
@@ -107,7 +104,7 @@ export const Route = createFileRoute("/api/classes")({
           });
 
           const enrollments = canManageGroupClasses(session)
-            ? db
+            ? await db
                 .select({
                   id: schema.groupClassBookings.id,
                   sessionId: schema.groupClassBookings.sessionId,
@@ -121,15 +118,13 @@ export const Route = createFileRoute("/api/classes")({
                 .innerJoin(schema.users, eq(schema.groupClassBookings.customerId, schema.users.id))
                 .orderBy(desc(schema.groupClassBookings.createdAt))
                 .limit(500)
-                .all()
             : [];
 
-          const classes = hasAnyRole(session, ["admin"])
-            ? db
+          const classes = hasAnyRole(session, ["admin", "manager"])
+            ? await db
                 .select()
                 .from(schema.groupClasses)
                 .orderBy(desc(schema.groupClasses.createdAt))
-                .all()
             : [];
 
           return json({ sessions: rows, enrollments, classes });
@@ -144,7 +139,7 @@ export const Route = createFileRoute("/api/classes")({
       POST: async (ctx: unknown) => {
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) return json({ error: "Unauthorized" }, 401);
 
         const parsed = inputSchema.safeParse(await parseRequestBody(request as unknown));
@@ -153,40 +148,41 @@ export const Route = createFileRoute("/api/classes")({
 
         try {
           if (data.action === "create-class") {
-            if (!hasAnyRole(session, ["admin"])) return json({ error: "Forbidden" }, 403);
+            if (!canManageGroupClasses(session)) return json({ error: "Forbidden" }, 403);
             const id = newId();
-            db.insert(schema.groupClasses)
+            await db
+              .insert(schema.groupClasses)
               .values({
                 id,
                 title: data.title,
                 description: data.description ?? null,
                 level: data.level ?? null,
                 createdBy: session.userId,
-              })
-              .run();
+              });
             return json({ ok: true, id }, 201);
           }
 
           if (data.action === "schedule-session") {
-            if (!hasAnyRole(session, ["admin"])) return json({ error: "Forbidden" }, 403);
-            const cls = db
+            if (!canManageGroupClasses(session)) return json({ error: "Forbidden" }, 403);
+            const [cls] = await db
               .select({ id: schema.groupClasses.id })
               .from(schema.groupClasses)
               .where(eq(schema.groupClasses.id, data.classId))
-              .get();
+              .limit(1);
             if (!cls) return json({ error: "Class not found" }, 404);
             if (data.trainerId) {
-              const trainer = db
+              const [trainer] = await db
                 .select({ id: schema.users.id, role: schema.users.role })
                 .from(schema.users)
                 .where(eq(schema.users.id, data.trainerId))
-                .get();
-              if (!trainer || !["pt", "staff", "admin"].includes(trainer.role)) {
+                .limit(1);
+              if (!trainer || !["pt", "manager", "admin"].includes(trainer.role)) {
                 return json({ error: "Trainer not found" }, 400);
               }
             }
             const id = newId();
-            db.insert(schema.groupClassSessions)
+            await db
+              .insert(schema.groupClassSessions)
               .values({
                 id,
                 classId: data.classId,
@@ -194,22 +190,21 @@ export const Route = createFileRoute("/api/classes")({
                 startsAt: data.startsAt,
                 durationMinutes: data.durationMinutes,
                 capacity: data.capacity,
-              })
-              .run();
+              });
             return json({ ok: true, id }, 201);
           }
 
           if (data.action === "book-session") {
             if (session.role !== "customer")
               return json({ error: "Only customers can book classes" }, 403);
-            const classSession = db
+            const [classSession] = await db
               .select()
               .from(schema.groupClassSessions)
               .where(eq(schema.groupClassSessions.id, data.sessionId))
-              .get();
+              .limit(1);
             if (!classSession) return json({ error: "Session not found" }, 404);
 
-            const bookedRow = db
+            const [bookedRow] = await db
               .select({ count: sql<number>`count(*)` })
               .from(schema.groupClassBookings)
               .where(
@@ -218,8 +213,8 @@ export const Route = createFileRoute("/api/classes")({
                   eq(schema.groupClassBookings.status, "booked"),
                 ),
               )
-              .get();
-            const existing = db
+              .limit(1);
+            const [existing] = await db
               .select()
               .from(schema.groupClassBookings)
               .where(
@@ -228,7 +223,7 @@ export const Route = createFileRoute("/api/classes")({
                   eq(schema.groupClassBookings.customerId, session.userId),
                 ),
               )
-              .get();
+              .limit(1);
 
             if (
               !canBookGroupClassSession({
@@ -242,49 +237,49 @@ export const Route = createFileRoute("/api/classes")({
             }
 
             if (existing) {
-              db.update(schema.groupClassBookings)
+              await db
+                .update(schema.groupClassBookings)
                 .set({ status: "booked", attendedAt: null, updatedAt: new Date().toISOString() })
-                .where(eq(schema.groupClassBookings.id, existing.id))
-                .run();
+                .where(eq(schema.groupClassBookings.id, existing.id));
               return json({ ok: true, id: existing.id });
             }
 
             const id = newId();
-            db.insert(schema.groupClassBookings)
-              .values({ id, sessionId: data.sessionId, customerId: session.userId })
-              .run();
+            await db
+              .insert(schema.groupClassBookings)
+              .values({ id, sessionId: data.sessionId, customerId: session.userId });
             return json({ ok: true, id }, 201);
           }
 
           if (data.action === "cancel-booking") {
-            const booking = db
+            const [booking] = await db
               .select()
               .from(schema.groupClassBookings)
               .where(eq(schema.groupClassBookings.id, data.bookingId))
-              .get();
+              .limit(1);
             if (!booking) return json({ error: "Booking not found" }, 404);
             const canCancel =
-              hasAnyRole(session, ["admin", "staff"]) ||
+              hasAnyRole(session, ["admin", "manager"]) ||
               (session.role === "customer" && booking.customerId === session.userId);
             if (!canCancel) return json({ error: "Forbidden" }, 403);
-            db.update(schema.groupClassBookings)
+            await db
+              .update(schema.groupClassBookings)
               .set({ status: "cancelled", attendedAt: null, updatedAt: new Date().toISOString() })
-              .where(eq(schema.groupClassBookings.id, data.bookingId))
-              .run();
+              .where(eq(schema.groupClassBookings.id, data.bookingId));
             return json({ ok: true });
           }
 
           if (data.action === "mark-attendance") {
             if (!canManageGroupClasses(session)) return json({ error: "Forbidden" }, 403);
             const status = data.attended ? "attended" : "no_show";
-            db.update(schema.groupClassBookings)
+            await db
+              .update(schema.groupClassBookings)
               .set({
                 status,
                 attendedAt: data.attended ? new Date().toISOString() : null,
                 updatedAt: new Date().toISOString(),
               })
-              .where(eq(schema.groupClassBookings.id, data.bookingId))
-              .run();
+              .where(eq(schema.groupClassBookings.id, data.bookingId));
             return json({ ok: true });
           }
 

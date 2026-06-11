@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
-import { Upload, Scale, Activity, Droplets, Loader2 } from "lucide-react";
+import {
+  Activity,
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  ClipboardList,
+  Loader2,
+  Scale,
+  Upload,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,54 +22,79 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState, useCallback, useEffect } from "react";
-import { listInbodyReports, saveInbodyReport } from "@/lib/inbody.functions";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { listInbodyReports } from "@/lib/inbody.functions";
+import { buildInbodyExperience, type InbodyDelta } from "@/lib/customer-experience";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/inbody")({
-  head: () => ({ meta: [{ title: "InBody — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "InBody - HL Fitness" }] }),
   component: Inbody,
 });
 
 type Report = Awaited<ReturnType<typeof listInbodyReports>>[number];
 
+type FormState = {
+  reportDate: string;
+  weightKg: string;
+  muscleMassKg: string;
+  bodyFatPercent: string;
+};
+
+const today = () => new Date().toISOString().slice(0, 10);
+
 function Inbody() {
   const [reports, setReports] = useState<Report[]>([]);
-  const [stats, setStats] = useState({ weight: 0, muscle: 0, fat: 0 });
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>({
+    reportDate: today(),
+    weightKg: "",
+    muscleMassKg: "",
+    bodyFatPercent: "",
+  });
+
+  const summary = useMemo(() => buildInbodyExperience(reports), [reports]);
 
   const fetchReports = useCallback(async () => {
     const res = await fetch("/api/inbody", { credentials: "include" });
-    if (!res.ok) return [];
-    return res.json();
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? "Unable to load InBody history");
+    }
+    return res.json() as Promise<Report[]>;
   }, []);
 
   const saveReport = async (payload: {
     data: { reportDate: string; weightKg: number; muscleMassKg: number; bodyFatPercent: number };
   }) => {
-    await fetch("/api/inbody", {
+    const res = await fetch("/api/inbody", {
       method: "POST",
       credentials: "include",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload.data),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? "Unable to save report");
+    }
+    return res.json();
   };
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
-      const data = await fetchReports();
-      setReports(data);
-      if (data.length > 0) {
-        setStats({
-          weight: data[0].weightKg,
-          muscle: data[0].muscleMassKg,
-          fat: data[0].bodyFatPercent,
-        });
-      }
-    } catch {
-      toast.error("Failed to load history");
+      setReports(await fetchReports());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load InBody history";
+      setLoadError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
     }
   }, [fetchReports]);
 
@@ -68,20 +102,38 @@ function Inbody() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      reportDate: today(),
+      weightKg: summary.latest?.weightKg ? String(summary.latest.weightKg) : "",
+      muscleMassKg: summary.latest?.muscleMassKg ? String(summary.latest.muscleMassKg) : "",
+      bodyFatPercent: summary.latest?.bodyFatPercent ? String(summary.latest.bodyFatPercent) : "",
+    });
+  }, [open, summary.latest]);
+
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const payload = {
+      reportDate: form.reportDate,
+      weightKg: Number(form.weightKg),
+      muscleMassKg: Number(form.muscleMassKg),
+      bodyFatPercent: Number(form.bodyFatPercent),
+    };
+    if (
+      !payload.reportDate ||
+      !Number.isFinite(payload.weightKg) ||
+      !Number.isFinite(payload.muscleMassKg) ||
+      !Number.isFinite(payload.bodyFatPercent)
+    ) {
+      toast.error("Enter report date, weight, muscle, and body fat");
+      return;
+    }
+
     setBusy(true);
-    const fd = new FormData(e.currentTarget);
     try {
-      await saveReport({
-        data: {
-          reportDate: new Date().toISOString().slice(0, 10),
-          weightKg: Number(fd.get("weight")),
-          muscleMassKg: Number(fd.get("muscle")),
-          bodyFatPercent: Number(fd.get("fat")),
-        },
-      });
-      toast.success("Saved successfully");
+      await saveReport({ data: payload });
+      toast.success("InBody report saved");
       setOpen(false);
       load();
     } catch (err) {
@@ -92,76 +144,78 @@ function Inbody() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8 pb-24 md:pb-8">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <PageHeader title="InBody Reports" description="Track your body composition over time" />
+    <div className="mx-auto max-w-6xl p-4 pb-24 md:p-8">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <PageHeader
+          title="InBody Reports"
+          description="Turn body-composition numbers into a clearer baseline and trend."
+        />
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300 gap-2 mb-2 md:mb-0 w-full md:w-auto">
-              <Upload className="size-4" /> Upload New Result
+            <Button className="mb-2 w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90 md:mb-0 md:w-auto">
+              <Upload className="size-4" />
+              Add result
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] bg-[#0a0c08] border-white/10 text-slate-200">
+          <DialogContent className="border-white/10 bg-[#0a0c08] text-slate-200 sm:max-w-[520px]">
             <form onSubmit={handleSave}>
               <DialogHeader>
-                <DialogTitle>Log InBody Result</DialogTitle>
+                <DialogTitle>Log InBody result</DialogTitle>
                 <DialogDescription className="text-slate-400">
-                  Enter your latest metrics from the InBody machine to update your chart.
+                  Copy the key numbers from the machine. Alex uses these as progress context.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="weight" className="text-right text-slate-300">
-                    Weight (kg)
-                  </Label>
+              <div className="grid gap-4 py-5">
+                <Field label="Report date">
                   <Input
-                    id="weight"
-                    name="weight"
-                    type="number"
-                    step="0.1"
-                    defaultValue={stats.weight}
-                    className="col-span-3 bg-white/5 border-white/10"
+                    type="date"
+                    value={form.reportDate}
+                    onChange={(e) => setForm({ ...form, reportDate: e.target.value })}
                     required
                   />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="muscle" className="text-right text-slate-300">
-                    SMM (kg)
-                  </Label>
-                  <Input
-                    id="muscle"
-                    name="muscle"
-                    type="number"
-                    step="0.1"
-                    defaultValue={stats.muscle}
-                    className="col-span-3 bg-white/5 border-white/10"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="fat" className="text-right text-slate-300">
-                    PBF (%)
-                  </Label>
-                  <Input
-                    id="fat"
-                    name="fat"
-                    type="number"
-                    step="0.1"
-                    defaultValue={stats.fat}
-                    className="col-span-3 bg-white/5 border-white/10"
-                    required
-                  />
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="Weight (kg)">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={form.weightKg}
+                      onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
+                      placeholder="80.2"
+                      required
+                    />
+                  </Field>
+                  <Field label="Muscle (kg)">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={form.muscleMassKg}
+                      onChange={(e) => setForm({ ...form, muscleMassKg: e.target.value })}
+                      placeholder="35.4"
+                      required
+                    />
+                  </Field>
+                  <Field label="Body fat (%)">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={form.bodyFatPercent}
+                      onChange={(e) => setForm({ ...form, bodyFatPercent: e.target.value })}
+                      placeholder="17.8"
+                      required
+                    />
+                  </Field>
                 </div>
               </div>
               <DialogFooter>
                 <Button
                   type="submit"
                   disabled={busy}
-                  className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
                 >
-                  {busy && <Loader2 className="size-4 mr-2 animate-spin" />}
-                  Save changes
+                  {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  Save result
                 </Button>
               </DialogFooter>
             </form>
@@ -169,83 +223,225 @@ function Inbody() {
         </Dialog>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6 mt-8">
-        <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-6 animate-fade-up">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="size-10 rounded-xl bg-yellow-400/20 text-yellow-400 grid place-items-center">
-              <Scale className="size-5" />
-            </div>
-            <div className="text-sm font-medium text-slate-300">Weight</div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <div className="text-3xl font-bold text-slate-100">{stats.weight}</div>
-            <div className="text-sm text-slate-500">kg</div>
-          </div>
+      {loading ? (
+        <div className="mt-8 rounded-2xl border border-white/10 bg-[#111612]/95 p-6 text-sm text-slate-400">
+          <Loader2 className="mr-2 inline size-4 animate-spin" />
+          Loading InBody history
         </div>
-
-        <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-6 animate-fade-up stagger-1">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="size-10 rounded-xl bg-yellow-400/20 text-yellow-400 grid place-items-center">
-              <Activity className="size-5" />
-            </div>
-            <div className="text-sm font-medium text-slate-300">Skeletal Muscle</div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <div className="text-3xl font-bold text-slate-100">{stats.muscle}</div>
-            <div className="text-sm text-slate-500">kg</div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-6 animate-fade-up stagger-2">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="size-10 rounded-xl bg-yellow-400/20 text-yellow-400 grid place-items-center">
-              <Droplets className="size-5" />
-            </div>
-            <div className="text-sm font-medium text-slate-300">Body Fat</div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <div className="text-3xl font-bold text-slate-100">{stats.fat}</div>
-            <div className="text-sm text-slate-500">%</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-10 rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-4 md:p-6 animate-fade-in flex flex-col items-center">
-        <h3 className="text-lg font-semibold text-slate-200 mb-6 self-start w-full border-b border-white/10 pb-4">
-          Detailed History
-        </h3>
-
-        {reports.length === 0 ? (
-          <div className="text-center py-10 w-full relative overflow-hidden flex flex-col justify-center items-center">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)]" />
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="size-16 rounded-full bg-slate-800/80 border border-white/10 flex items-center justify-center mb-4">
-                <Scale className="size-8 text-slate-400" />
-              </div>
-              <p className="text-slate-400 text-sm text-center max-w-sm mb-6">
-                Upload minimum 1 InBody report to unlock the detailed history graph and AI
-                predictive analysis.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="w-full space-y-3">
-            {reports.map((r) => (
-              <div
-                key={r.id}
-                className="flex justify-between items-center rounded-xl bg-white/5 border border-white/10 p-4"
-              >
+      ) : loadError ? (
+        <EmptyState title="InBody history could not load" detail={loadError} onRetry={load} />
+      ) : (
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+          <section className="space-y-6">
+            <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 shadow-[0_30px_80px_-55px_rgba(250,204,21,0.45)] sm:p-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <div className="font-semibold text-slate-200">{formatDate(r.reportDate)}</div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Weight: {r.weightKg}kg • SMM: {r.muscleMassKg}kg • Fat: {r.bodyFatPercent}%
-                  </div>
+                  <div className="text-xs font-medium text-primary">{summary.baselineLabel}</div>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-100">
+                    {summary.latest ? formatDate(summary.latest.reportDate) : "Add your first scan"}
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                    {summary.previous
+                      ? `Compared with ${formatDate(summary.previous.reportDate)}.`
+                      : "Add another result later to unlock trend comparisons."}
+                  </p>
+                </div>
+                <div className="grid size-12 place-items-center rounded-2xl bg-primary/15 text-primary">
+                  <Scale className="size-5" />
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+
+              {summary.latest ? (
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <MetricCard
+                    icon={Scale}
+                    label="Weight"
+                    value={`${summary.latest.weightKg}kg`}
+                    delta={summary.deltas.weightKg}
+                  />
+                  <MetricCard
+                    icon={Activity}
+                    label="Muscle"
+                    value={`${summary.latest.muscleMassKg}kg`}
+                    delta={summary.deltas.muscleMassKg}
+                  />
+                  <MetricCard
+                    icon={ClipboardList}
+                    label="Body fat"
+                    value={`${summary.latest.bodyFatPercent}%`}
+                    delta={summary.deltas.bodyFatPercent}
+                  />
+                </div>
+              ) : (
+                <EmptyState
+                  title="No InBody report yet"
+                  detail="Add weight, skeletal muscle, and body-fat percentage to create your baseline."
+                  compact
+                />
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 sm:p-6">
+              <div className="mb-4">
+                <div className="text-xs text-slate-400">Trend summary</div>
+                <h3 className="mt-2 text-lg font-semibold text-slate-100">Latest comparison</h3>
+              </div>
+              {summary.previous ? (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <DeltaCard delta={summary.deltas.weightKg} />
+                  <DeltaCard delta={summary.deltas.muscleMassKg} />
+                  <DeltaCard delta={summary.deltas.bodyFatPercent} />
+                </div>
+              ) : (
+                <EmptyState
+                  title="One report saved"
+                  detail="Your next report will show whether weight, muscle, and body fat are moving."
+                  compact
+                />
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 sm:p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400">History</div>
+                <h3 className="mt-2 text-lg font-semibold text-slate-100">Comparison history</h3>
+              </div>
+              <div className="grid size-10 place-items-center rounded-2xl bg-white/[0.05] text-slate-300">
+                <ClipboardList className="size-5" />
+              </div>
+            </div>
+
+            {summary.history.length === 0 ? (
+              <EmptyState
+                title="No reports yet"
+                detail="Add your first report to begin body-composition tracking."
+                compact
+              />
+            ) : (
+              <div className="space-y-3">
+                {summary.history.map((r, index) => (
+                  <div
+                    key={r.id}
+                    className="rounded-2xl border border-white/10 bg-white/[0.05] p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium text-slate-100">{formatDate(r.reportDate)}</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Weight {r.weightKg}kg | Muscle {r.muscleMassKg}kg | Fat {r.bodyFatPercent}
+                          %
+                        </div>
+                      </div>
+                      {index === 0 && (
+                        <span className="rounded-full bg-primary/15 px-2 py-1 text-[11px] text-primary">
+                          Latest
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  delta,
+}: {
+  icon: typeof Scale;
+  label: string;
+  value: string;
+  delta: InbodyDelta;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="grid size-10 place-items-center rounded-xl bg-primary/15 text-primary">
+          <Icon className="size-5" />
+        </div>
+        <DeltaPill delta={delta} />
       </div>
+      <div className="text-xs text-slate-400">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-slate-100">{value}</div>
+    </div>
+  );
+}
+
+function DeltaCard({ delta }: { delta: InbodyDelta }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="text-xs text-slate-400">{delta.label}</div>
+      <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-100">
+        <TrendIcon direction={delta.direction} />
+        {formatDelta(delta)}
+      </div>
+    </div>
+  );
+}
+
+function DeltaPill({ delta }: { delta: InbodyDelta }) {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
+      <TrendIcon direction={delta.direction} />
+      {formatDelta(delta)}
+    </div>
+  );
+}
+
+function TrendIcon({ direction }: { direction: InbodyDelta["direction"] }) {
+  if (direction === "up") return <ArrowUpRight className="size-3.5 text-emerald-200" />;
+  if (direction === "down") return <ArrowDownRight className="size-3.5 text-blue-200" />;
+  return <ArrowRight className="size-3.5 text-slate-400" />;
+}
+
+function formatDelta(delta: InbodyDelta) {
+  if (delta.value === null) return "No comparison";
+  const sign = delta.value > 0 ? "+" : delta.value < 0 ? "-" : "";
+  return `${sign}${Math.abs(delta.value).toFixed(1)}${delta.unit}`;
+}
+
+function EmptyState({
+  title,
+  detail,
+  onRetry,
+  compact = false,
+}: {
+  title: string;
+  detail: string;
+  onRetry?: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border border-dashed border-white/10 bg-white/[0.03] text-center ${
+        compact ? "p-5" : "mt-8 p-8"
+      }`}
+    >
+      <div className="text-sm font-medium text-slate-100">{title}</div>
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-400">{detail}</p>
+      {onRetry && (
+        <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onRetry}>
+          Try again
+        </Button>
+      )}
     </div>
   );
 }

@@ -57,7 +57,7 @@ export const Route = createFileRoute("/api/weekly-analysis")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -75,7 +75,7 @@ export const Route = createFileRoute("/api/weekly-analysis")({
         const startYmd = formatYmd(startDate);
         const endYmd = formatYmd(endDate);
 
-        const logs = db
+        const logs = (await db
           .select({
             performedAt: schema.workoutLogs.performedAt,
             exercise: schema.workoutLogs.exercise,
@@ -94,9 +94,9 @@ export const Route = createFileRoute("/api/weekly-analysis")({
             ),
           )
           .orderBy(desc(schema.workoutLogs.performedAt), desc(schema.workoutLogs.createdAt))
-          .all() as WorkoutLogRow[];
+          .limit(500)) as WorkoutLogRow[];
 
-        const profile = db
+        const [profile] = (await db
           .select({
             goal: schema.profiles.goal,
             level: schema.profiles.level,
@@ -106,7 +106,7 @@ export const Route = createFileRoute("/api/weekly-analysis")({
           })
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, session.userId))
-          .get() as ProfileRow | undefined;
+          .limit(1)) as ProfileRow[];
 
         const uniqueDays = new Set(logs.map((log) => log.performedAt));
         const totalVolume = logs.reduce((sum, log) => {
@@ -218,14 +218,14 @@ ${logs
 
         const id = newId();
         try {
-          db.insert(schema.analyses)
+          await db
+            .insert(schema.analyses)
             .values({
               id,
               userId: session.userId,
               planDate: endYmd,
               contentMd,
-            })
-            .run();
+            });
           return new Response(JSON.stringify({ ok: true, id, planDate: endYmd }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

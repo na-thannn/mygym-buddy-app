@@ -6,14 +6,19 @@ import { parseRequestBody } from "@/lib/request-utils";
 import logDevError from "@/lib/error-logger";
 import type { MaybeWrappedRequest } from "@/types/dev";
 
+function getRouteRequest(ctx: unknown): Request {
+  const maybe = ctx as MaybeWrappedRequest;
+  return (maybe.request as Request | undefined) ?? (ctx as Request);
+}
+
 export const Route = createFileRoute("/api/feed")({
   server: {
     handlers: {
       GET: async () => {
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
-        const rows = db
+        const rows = await db
           .select({
             id: schema.communityFeed.id,
             content: schema.communityFeed.content,
@@ -25,18 +30,16 @@ export const Route = createFileRoute("/api/feed")({
           .from(schema.communityFeed)
           .leftJoin(schema.users, eq(schema.communityFeed.userId, schema.users.id))
           .orderBy(desc(schema.communityFeed.createdAt))
-          .limit(50)
-          .all();
+          .limit(50);
         return new Response(JSON.stringify(rows), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       },
       POST: async (ctx: unknown) => {
-        const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
-        const request = maybe.request ?? (ctx as unknown as Request);
+        const request = getRouteRequest(ctx);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -60,8 +63,7 @@ export const Route = createFileRoute("/api/feed")({
           const createdAt = bodyObj?.createdAt
             ? String(bodyObj.createdAt)
             : new Date().toISOString();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (db as any)
+          await db
             .insert(schema.communityFeed)
             .values({
               id,
@@ -69,8 +71,7 @@ export const Route = createFileRoute("/api/feed")({
               content,
               imageBase64,
               createdAt,
-            })
-            .run();
+            });
           return new Response(JSON.stringify({ ok: true, id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

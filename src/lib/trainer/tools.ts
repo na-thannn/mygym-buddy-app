@@ -13,7 +13,7 @@ export function buildAlexTools(userId: string) {
   return {
     save_profile: tool({
       description:
-        "Save or update the user's profile: goal, experience level, limitations, age, gender, height, weight. Call this after collecting profile info during onboarding or when the user asks to update their profile.",
+        "Save or update the user's profile: goal, experience level, limitations, age, gender, height, current weight, and target weight. Call this only after collecting the fields the user wants to save or update.",
       inputSchema: z.object({
         goal: z.string().optional(),
         level: z.enum(["Beginner", "Intermediate", "Advanced"]).optional(),
@@ -22,20 +22,19 @@ export function buildAlexTools(userId: string) {
         gender: z.enum(["male", "female", "other"]).optional(),
         heightCm: z.number().min(50).max(280).optional(),
         weightKg: z.number().min(20).max(400).optional(),
+        targetWeightKg: z.number().min(20).max(400).optional(),
       }),
       execute: async (input) => {
-        const existing = db
+        const [existing] = await db
           .select({ userId: schema.profiles.userId })
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, userId))
-          .get();
+          .limit(1);
         const patch = { ...input, updatedAt: new Date().toISOString() };
         if (existing) {
-          db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, userId)).run();
+          await db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, userId));
         } else {
-          db.insert(schema.profiles)
-            .values({ userId, ...patch })
-            .run();
+          await db.insert(schema.profiles).values({ userId, ...patch });
         }
         return { ok: true, saved: input };
       },
@@ -45,29 +44,44 @@ export function buildAlexTools(userId: string) {
       description: "Read the current user's profile (goal, level, limitations, age, weight, etc).",
       inputSchema: z.object({}),
       execute: async () => {
-        const row = db
+        const [row] = await db
           .select()
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, userId))
-          .get();
+          .limit(1);
         return row ?? { empty: true };
       },
     }),
 
     generate_workout_plan: tool({
       description:
-        "Generate a personalized workout plan for a given date and save it as Markdown. Use this when the user asks for a workout plan. Always ask first: how many days/week and what equipment they have access to.",
+        "Generate a personalized workout plan for a given date and save it as Markdown. Use this when the user asks for a workout plan. Before calling, make sure you know days per week, available equipment, goal, level, and relevant limitations; ask one missing question at a time.",
       inputSchema: z.object({
         planDate: z.string().describe("YYYY-MM-DD"),
         daysPerWeek: z.string().describe("e.g. '4 days', '6-7 days'"),
         equipment: z.string().describe("e.g. 'Full gym', 'Dumbbells at home', 'Bodyweight only'"),
+        goal: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("The user's current goal for this plan, if they supplied it in chat"),
+        level: z
+          .string()
+          .max(120)
+          .optional()
+          .describe("The user's experience level or training history, if supplied in chat"),
+        limitations: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("Injuries, movement limits, or constraints supplied in chat"),
       }),
-      execute: async ({ planDate, daysPerWeek, equipment }) => {
-        const profile = db
+      execute: async ({ planDate, daysPerWeek, equipment, goal, level, limitations }) => {
+        const [profile] = await db
           .select()
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, userId))
-          .get();
+          .limit(1);
         const groq = getGroq();
         const sys = `You are Alex, a certified personal trainer. Generate a complete workout plan in Markdown.
 RULES:
@@ -77,9 +91,9 @@ RULES:
 - Add a short notes/tips section at the end
 Return ONLY the Markdown plan, no preamble.`;
         const usr = `User profile:
-- Goal: ${profile?.goal || "general fitness"}
-- Level: ${profile?.level || "beginner"}
-- Limitations: ${profile?.limitations || "none"}
+- Goal: ${goal || profile?.goal || "general fitness"}
+- Level: ${level || profile?.level || "beginner"}
+- Limitations: ${limitations || profile?.limitations || "none"}
 - Age: ${profile?.age ?? "n/a"}
 - Weight: ${profile?.weightKg ?? "n/a"} kg
 - Days/week: ${daysPerWeek}
@@ -93,22 +107,22 @@ Return ONLY the Markdown plan, no preamble.`;
           ],
         });
         const id = newId();
-        db.insert(schema.workoutPlanDocs)
+        await db
+          .insert(schema.workoutPlanDocs)
           .values({
             id,
             userId,
             planDate,
-            title: `Plan for ${planDate} — ${daysPerWeek}`,
+            title: `Plan for ${planDate} - ${daysPerWeek}`,
             contentMd: text,
-          })
-          .run();
+          });
         return { ok: true, planDate, preview: text.slice(0, 400) };
       },
     }),
 
     log_workout_entry: tool({
       description:
-        "Log a single completed exercise for a date. Loop in the conversation by asking 'log another?' after each.",
+        "Log one completed exercise for a date. Before calling, make sure the exercise name and date are known; ask for sets, reps, weight, and notes when useful. After logging, ask whether to log another exercise.",
       inputSchema: z.object({
         performedAt: z.string().describe("YYYY-MM-DD"),
         dayLabel: z.string().optional(),
@@ -121,16 +135,14 @@ Return ONLY the Markdown plan, no preamble.`;
       }),
       execute: async (input) => {
         const id = newId();
-        db.insert(schema.workoutLogs)
-          .values({ id, userId, ...input })
-          .run();
+        await db.insert(schema.workoutLogs).values({ id, userId, ...input });
         return { ok: true, id };
       },
     }),
 
     log_nutrition_report: tool({
       description:
-        "Save a full daily nutrition log. After collecting all meals, also estimates macros via AI. Always ask: breakfast, lunch, dinner, snacks, day type, and for workout days the pre/post workout meal.",
+        "Save a full daily nutrition log. Before calling, collect breakfast, lunch, dinner, snacks, day type, and for workout days the pre/post workout meal. If the user only asks for advice, read context and answer without writing a report.",
       inputSchema: z.object({
         reportDate: z.string(),
         breakfast: z.string().optional(),
@@ -155,7 +167,8 @@ Return ONLY the Markdown plan, no preamble.`;
           await logDevError({ error: e, req: null }).catch(() => {});
         }
         const id = newId();
-        db.insert(schema.nutritionReports)
+        await db
+          .insert(schema.nutritionReports)
           .values({
             id,
             userId,
@@ -172,8 +185,7 @@ Return ONLY the Markdown plan, no preamble.`;
             proteinG: macros?.protein_g,
             carbsG: macros?.carbs_g,
             fatsG: macros?.fats_g,
-          })
-          .run();
+          });
         return { ok: true, id, macros };
       },
     }),
@@ -190,9 +202,7 @@ Return ONLY the Markdown plan, no preamble.`;
       }),
       execute: async (input) => {
         const id = newId();
-        db.insert(schema.progressReports)
-          .values({ id, userId, ...input })
-          .run();
+        await db.insert(schema.progressReports).values({ id, userId, ...input });
         return { ok: true, id };
       },
     }),
@@ -202,7 +212,7 @@ Return ONLY the Markdown plan, no preamble.`;
         "Fetch the saved workout plan Markdown for a date (used before analyzing progress).",
       inputSchema: z.object({ planDate: z.string() }),
       execute: async ({ planDate }) => {
-        const row = db
+        const [row] = await db
           .select()
           .from(schema.workoutPlanDocs)
           .where(
@@ -212,7 +222,7 @@ Return ONLY the Markdown plan, no preamble.`;
             ),
           )
           .orderBy(desc(schema.workoutPlanDocs.createdAt))
-          .get();
+          .limit(1);
         return row ?? { empty: true, message: `No plan saved for ${planDate}` };
       },
     }),
@@ -221,7 +231,7 @@ Return ONLY the Markdown plan, no preamble.`;
       description: "Fetch all workout log entries since a date (YYYY-MM-DD) for analysis.",
       inputSchema: z.object({ fromDate: z.string() }),
       execute: async ({ fromDate }) => {
-        const rows = db
+        const rows = await db
           .select()
           .from(schema.workoutLogs)
           .where(
@@ -230,8 +240,7 @@ Return ONLY the Markdown plan, no preamble.`;
               gte(schema.workoutLogs.performedAt, fromDate),
             ),
           )
-          .orderBy(desc(schema.workoutLogs.performedAt))
-          .all();
+          .orderBy(desc(schema.workoutLogs.performedAt));
         return { count: rows.length, entries: rows };
       },
     }),
@@ -245,30 +254,113 @@ Return ONLY the Markdown plan, no preamble.`;
       }),
       execute: async ({ planDate, analysisMd }) => {
         const id = newId();
-        db.insert(schema.analyses).values({ id, userId, planDate, contentMd: analysisMd }).run();
+        await db.insert(schema.analyses).values({ id, userId, planDate, contentMd: analysisMd });
         return { ok: true, id };
       },
     }),
 
     create_support_ticket: tool({
       description:
-        "Create a human support ticket when the user asks for staff/PT help, reports a booking issue, or needs a human to follow up. Ask for a short subject and issue summary first if missing.",
+        "Create a human support ticket when the user asks for manager/PT help, reports a booking issue, or needs a human to follow up. Ask for a short subject and issue summary first if missing.",
       inputSchema: z.object({
         subject: z.string().min(3).max(120),
         message: z.string().min(5).max(2000),
       }),
       execute: async ({ subject, message }) => {
         const id = newId();
-        db.insert(schema.supportTickets)
+        await db
+          .insert(schema.supportTickets)
           .values({
             id,
             customerId: userId,
             subject,
             message,
             source: "ai_chat",
-          })
-          .run();
+          });
         return { ok: true, id };
+      },
+    }),
+
+    get_recent_nutrition: tool({
+      description:
+        "Read recent nutrition reports for the current user. Use this before giving specific nutrition feedback or when the user asks what they have been eating recently.",
+      inputSchema: z.object({
+        fromDate: z.string().optional().describe("Optional YYYY-MM-DD lower bound"),
+        limit: z.number().int().min(1).max(20).default(5),
+      }),
+      execute: async ({ fromDate, limit }) => {
+        const where = fromDate
+          ? and(
+              eq(schema.nutritionReports.userId, userId),
+              gte(schema.nutritionReports.reportDate, fromDate),
+            )
+          : eq(schema.nutritionReports.userId, userId);
+        const rows = await db
+          .select()
+          .from(schema.nutritionReports)
+          .where(where)
+          .orderBy(
+            desc(schema.nutritionReports.reportDate),
+            desc(schema.nutritionReports.createdAt),
+          )
+          .limit(limit);
+        return { count: rows.length, reports: rows };
+      },
+    }),
+
+    get_inbody_reports: tool({
+      description:
+        "Read recent InBody reports for the current user. Use this before discussing body composition, muscle mass, body fat, or weight trends.",
+      inputSchema: z.object({
+        limit: z.number().int().min(1).max(10).default(3),
+      }),
+      execute: async ({ limit }) => {
+        const rows = await db
+          .select()
+          .from(schema.inbodyReports)
+          .where(eq(schema.inbodyReports.userId, userId))
+          .orderBy(desc(schema.inbodyReports.reportDate), desc(schema.inbodyReports.createdAt))
+          .limit(limit);
+        return { count: rows.length, reports: rows };
+      },
+    }),
+
+    get_progress_reports: tool({
+      description:
+        "Read recent progress reports for the current user. Use this before discussing streaks, consistency, total sessions, or training volume.",
+      inputSchema: z.object({
+        fromDate: z.string().optional().describe("Optional YYYY-MM-DD lower bound"),
+        limit: z.number().int().min(1).max(20).default(5),
+      }),
+      execute: async ({ fromDate, limit }) => {
+        const where = fromDate
+          ? and(
+              eq(schema.progressReports.userId, userId),
+              gte(schema.progressReports.reportDate, fromDate),
+            )
+          : eq(schema.progressReports.userId, userId);
+        const rows = await db
+          .select()
+          .from(schema.progressReports)
+          .where(where)
+          .orderBy(desc(schema.progressReports.reportDate), desc(schema.progressReports.createdAt))
+          .limit(limit);
+        return { count: rows.length, reports: rows };
+      },
+    }),
+
+    get_latest_analysis: tool({
+      description:
+        "Read the latest saved AI analysis for the current user. Use this before continuing a previous progress discussion or comparing current training against prior recommendations.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const [row] = await db
+          .select()
+          .from(schema.analyses)
+          .where(eq(schema.analyses.userId, userId))
+          .orderBy(desc(schema.analyses.createdAt))
+          .limit(1);
+        return row ?? { empty: true };
       },
     }),
   };

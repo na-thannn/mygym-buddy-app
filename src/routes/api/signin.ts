@@ -6,8 +6,9 @@ import { hashPassword, createSession, setSessionCookie } from "@/server/auth";
 import { parseRequestBody } from "@/lib/request-utils";
 import logDevError from "@/lib/error-logger";
 import type { MaybeWrappedRequest } from "@/types/dev";
+import { authEmailSchema } from "@/lib/auth-input";
 
-const inputSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
+const inputSchema = z.object({ email: authEmailSchema, password: z.string().min(1) });
 
 export const Route = createFileRoute("/api/signin")({
   server: {
@@ -59,11 +60,11 @@ export const Route = createFileRoute("/api/signin")({
             });
           }
           const data = parsed.data;
-          const user = db
+          const [user] = await db
             .select()
             .from(schema.users)
             .where(eq(schema.users.email, data.email))
-            .get();
+            .limit(1);
           if (!user) {
             return new Response(JSON.stringify({ error: "Email or password is incorrect" }), {
               status: 400,
@@ -78,7 +79,7 @@ export const Route = createFileRoute("/api/signin")({
               headers: { "Content-Type": "application/json" },
             });
           }
-          const { token, expiresAt } = createSession(user.id);
+          const { token, expiresAt } = await createSession(user.id);
           setSessionCookie(token, expiresAt);
           return new Response(
             JSON.stringify({

@@ -11,15 +11,14 @@ export const Route = createFileRoute("/api/progress-photos")({
     handlers: {
       GET: async () => {
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
-        const rows = db
+        const rows = await db
           .select()
           .from(schema.progressPhotos)
           .where(eq(schema.progressPhotos.userId, session.userId))
           .orderBy(desc(schema.progressPhotos.createdAt))
-          .limit(20)
-          .all();
+          .limit(20);
         return new Response(JSON.stringify(rows), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -29,7 +28,7 @@ export const Route = createFileRoute("/api/progress-photos")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -44,9 +43,9 @@ export const Route = createFileRoute("/api/progress-photos")({
           });
         const id = newId();
         try {
-          db.insert(schema.progressPhotos)
-            .values({ id, userId: session.userId, imageBase64: bodyObj.imageBase64 })
-            .run();
+          await db
+            .insert(schema.progressPhotos)
+            .values({ id, userId: session.userId, imageBase64: bodyObj.imageBase64 });
           return new Response(JSON.stringify({ ok: true, id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

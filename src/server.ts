@@ -1,5 +1,5 @@
 import "./lib/error-capture";
-import logDevError from "./lib/error-logger";
+import logDevError, { isDevLoggingEnabled } from "./lib/error-logger";
 import { appendFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
 
@@ -91,7 +91,11 @@ export default {
         try {
           const url = (request as Request).url || "";
           const method = (request as Request).method || "";
-          if (method === "POST" && (url.endsWith("/api/signup") || url.endsWith("/api/signin"))) {
+          if (
+            isDevLoggingEnabled() &&
+            method === "POST" &&
+            (url.endsWith("/api/signup") || url.endsWith("/api/signin"))
+          ) {
             const logPath = "logs/req-snapshots.log";
             try {
               mkdirSync(dirname(logPath), { recursive: true });
@@ -183,14 +187,14 @@ export default {
             };
             try {
               appendFileSync(logPath, JSON.stringify(snapshot) + "\n", "utf8");
-            } catch (e) {
+            } catch {
               // best-effort
             }
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
-      } catch (e) {}
+      } catch {}
 
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
@@ -202,7 +206,9 @@ export default {
           const reqInfo = { method: (request as Request).method, url: (request as Request).url };
           await logger.logDevError({ error, req: reqInfo }).catch(() => {});
         } catch (e) {
-          console.error("Failed to persist server error", e);
+          if (isDevLoggingEnabled()) {
+            console.error("Failed to persist server error", e);
+          }
         }
       }
       return brandedErrorResponse();

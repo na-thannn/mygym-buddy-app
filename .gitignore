@@ -26,6 +26,9 @@ cookies.txt
 .understand-anything/*
 !.understand-anything/.understandignore
 
+# Graphify generated output
+graphify-out/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

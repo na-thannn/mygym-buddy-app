@@ -6,29 +6,32 @@ import { parseRequestBody } from "@/lib/request-utils";
 import logDevError from "@/lib/error-logger";
 import type { MaybeWrappedRequest } from "@/types/dev";
 
+function getRouteRequest(ctx: unknown): Request {
+  const maybe = ctx as MaybeWrappedRequest;
+  return (maybe.request as Request | undefined) ?? (ctx as Request);
+}
+
 export const Route = createFileRoute("/api/inbody")({
   server: {
     handlers: {
       GET: async () => {
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
-        const rows = db
+        const rows = await db
           .select()
           .from(schema.inbodyReports)
           .where(eq(schema.inbodyReports.userId, session.userId))
-          .orderBy(desc(schema.inbodyReports.reportDate))
-          .all();
+          .orderBy(desc(schema.inbodyReports.reportDate));
         return new Response(JSON.stringify(rows), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       },
       POST: async (ctx: unknown) => {
-        const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
-        const request = maybe.request ?? (ctx as unknown as Request);
+        const request = getRouteRequest(ctx);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -82,8 +85,7 @@ export const Route = createFileRoute("/api/inbody")({
         const id = newId();
         const createdAt = new Date().toISOString();
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (db as any)
+          await db
             .insert(schema.inbodyReports)
             .values({
               id,
@@ -91,10 +93,9 @@ export const Route = createFileRoute("/api/inbody")({
               weightKg: Number(weightKg) || 0,
               reportDate,
               muscleMassKg: Number(muscleMassKg) || 0,
-              bodyFatPercent: bodyFatPercent as unknown as number | undefined,
+              bodyFatPercent: Number(bodyFatPercent) || 0,
               createdAt,
-            })
-            .run();
+            });
           return new Response(JSON.stringify({ ok: true, id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

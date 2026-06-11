@@ -35,9 +35,9 @@ describe("group class helpers", () => {
     ).toBe(false);
   });
 
-  it("limits class management to admins, staff, and PTs", () => {
+  it("limits class management to admins, managers, and PTs", () => {
     expect(canManageGroupClasses({ userId: "admin-1", role: "admin" })).toBe(true);
-    expect(canManageGroupClasses({ userId: "staff-1", role: "staff" })).toBe(true);
+    expect(canManageGroupClasses({ userId: "manager-1", role: "manager" })).toBe(true);
     expect(canManageGroupClasses({ userId: "pt-1", role: "pt" })).toBe(true);
     expect(canManageGroupClasses({ userId: "customer-1", role: "customer" })).toBe(false);
   });

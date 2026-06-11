@@ -7,7 +7,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -25,14 +25,14 @@ export const saveAnalysis = createServerFn({ method: "POST" })
     const { newId } = await import("@/server/auth");
     const id = newId();
     try {
-      db.insert(schema.analyses)
+      await db
+        .insert(schema.analyses)
         .values({
           id,
           userId: session.userId,
           planDate: data.planDate,
           contentMd: data.contentMd,
-        })
-        .run();
+        });
       return { ok: true, id };
     } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
@@ -43,11 +43,10 @@ export const saveAnalysis = createServerFn({ method: "POST" })
 export const listAnalyses = createServerFn({ method: "GET" }).handler(async () => {
   const session = await requireSession();
   const { db, schema } = await import("@/server/db");
-  return db
+  return await db
     .select()
     .from(schema.analyses)
     .where(eq(schema.analyses.userId, session.userId))
     .orderBy(desc(schema.analyses.createdAt))
-    .limit(100)
-    .all();
+    .limit(100);
 });

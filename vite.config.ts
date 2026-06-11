@@ -12,6 +12,10 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    // Runtime env is loaded explicitly from .env by the npm scripts.
+    // Keep Vite/TanStack from also loading .env, .env.local, or mode-specific env files.
+    // @ts-expect-error The Lovable TanStack wrapper forwards this Vite runtime option.
+    envFile: false,
     resolve: {
       alias: {
         // shim node:async_hooks in the browser to prevent Vite externalization runtime errors

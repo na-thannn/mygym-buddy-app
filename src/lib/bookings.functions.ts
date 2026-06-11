@@ -6,7 +6,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -25,11 +25,12 @@ export const createBooking = createServerFn({ method: "POST" })
     const { db, schema } = await import("@/server/db");
     const { newId } = await import("@/server/auth");
     // customers and admins can create bookings
-    if (!["customer", "admin", "staff", "pt"].includes(session.role)) {
+    if (!["customer", "admin", "manager", "pt"].includes(session.role)) {
       throw new Response("Forbidden", { status: 403 });
     }
     const id = newId();
-    db.insert(schema.bookings)
+    await db
+      .insert(schema.bookings)
       .values({
         id,
         customerId: session.userId,
@@ -37,8 +38,7 @@ export const createBooking = createServerFn({ method: "POST" })
         scheduledAt: data.scheduledAt,
         durationMinutes: data.durationMinutes ?? 60,
         notes: data.notes ?? null,
-      })
-      .run();
+      });
     return { ok: true, id };
   });
 
@@ -62,8 +62,8 @@ export const listBookings = createServerFn({ method: "GET" })
     // role-based defaults
     if (session.role === "customer") where.push(eq(schema.bookings.customerId, session.userId));
     else if (session.role === "pt") where.push(eq(schema.bookings.ptId, session.userId));
-    else if (session.role === "staff") {
-      // staff see bookings for pts they are assigned to? For now, show all
+    else if (session.role === "manager") {
+      // Managers can see operational bookings.
     }
     // optional filters (admin can pass filters)
     if (data.forUserId) where.push(eq(schema.bookings.customerId, data.forUserId));
@@ -71,20 +71,18 @@ export const listBookings = createServerFn({ method: "GET" })
     if (data.status) where.push(eq(schema.bookings.status, data.status));
 
     if (where.length) {
-      return db
+      return await db
         .select()
         .from(schema.bookings)
         .where(and(...where))
         .orderBy(desc(schema.bookings.scheduledAt))
-        .limit(data.limit)
-        .all();
+        .limit(data.limit);
     }
-    return db
+    return await db
       .select()
       .from(schema.bookings)
       .orderBy(desc(schema.bookings.scheduledAt))
-      .limit(data.limit)
-      .all();
+      .limit(data.limit);
   });
 
 const updateInput = z.object({
@@ -101,7 +99,11 @@ export const updateBooking = createServerFn({ method: "POST" })
     const session = await requireSession();
     const { db, schema } = await import("@/server/db");
     const id = data.id;
-    const existing = db.select().from(schema.bookings).where(eq(schema.bookings.id, id)).get();
+    const [existing] = await db
+      .select()
+      .from(schema.bookings)
+      .where(eq(schema.bookings.id, id))
+      .limit(1);
     if (!existing) throw new Response("Not found", { status: 404 });
 
     // Permission checks
@@ -114,11 +116,11 @@ export const updateBooking = createServerFn({ method: "POST" })
 
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     if (data.action === "accept") {
-      if (!["pt", "admin", "staff"].includes(session.role))
+      if (!["pt", "admin", "manager"].includes(session.role))
         throw new Response("Forbidden", { status: 403 });
       updates.status = "confirmed";
     } else if (data.action === "decline") {
-      if (!["pt", "admin", "staff"].includes(session.role))
+      if (!["pt", "admin", "manager"].includes(session.role))
         throw new Response("Forbidden", { status: 403 });
       updates.status = "declined";
       updates.cancelledBy = session.userId;
@@ -139,7 +141,7 @@ export const updateBooking = createServerFn({ method: "POST" })
       updates.status = "completed";
     }
 
-    db.update(schema.bookings).set(updates).where(eq(schema.bookings.id, id)).run();
+    await db.update(schema.bookings).set(updates).where(eq(schema.bookings.id, id));
     return { ok: true };
   });
 

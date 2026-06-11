@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/plan-feedback")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -44,11 +44,11 @@ export const Route = createFileRoute("/api/plan-feedback")({
           });
         }
 
-        const profile = db
+        const [profile] = await db
           .select()
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, session.userId))
-          .get();
+          .limit(1);
 
         let groq;
         try {

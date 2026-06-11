@@ -1,227 +1,149 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import pg from "pg";
+import { DataType, newDb } from "pg-mem";
+import { resolve } from "node:path";
 import * as schema from "./schema";
 
-const dbPath = process.env.SQLITE_PATH ?? resolve(process.cwd(), "data/app.db");
-mkdirSync(dirname(dbPath), { recursive: true });
+const DEFAULT_DATABASE_URL = "postgres://hlfitness:hlfitness@localhost:5432/hlfitness";
+const migrationsFolder = resolve(process.cwd(), "drizzle");
+const isTestRuntime = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 
-const sqlite = new Database(dbPath);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+function createMemoryPool(): pg.Pool {
+  const memoryDb = newDb({ autoCreateForeignKeyIndices: true });
+  memoryDb.public.registerFunction({
+    name: "current_database",
+    returns: DataType.text,
+    implementation: () => "hlfitness_test",
+  });
+  memoryDb.public.registerFunction({
+    name: "version",
+    returns: DataType.text,
+    implementation: () => "PostgreSQL 16.0 (pg-mem)",
+  });
+  const adapter = memoryDb.adapters.createPg();
+  const memoryPool = new adapter.Pool();
+  return patchPgMemPool(memoryPool) as unknown as pg.Pool;
+}
 
-// Inline migrations — runs on every boot, idempotent (CREATE TABLE IF NOT EXISTS).
-const ddl = `
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  display_name TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'customer',
-  assigned_pt_id TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS sessions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  expires_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-CREATE TABLE IF NOT EXISTS profiles (
-  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  goal TEXT,
-  level TEXT,
-  limitations TEXT,
-  age INTEGER,
-  gender TEXT,
-  height_cm REAL,
-  weight_kg REAL,
-  target_weight_kg REAL,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS workout_logs (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  performed_at TEXT NOT NULL,
-  day_label TEXT,
-  muscle_group TEXT,
-  exercise TEXT NOT NULL,
-  sets INTEGER,
-  reps TEXT,
-  weight_kg REAL,
-  notes TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_workout_user_date ON workout_logs(user_id, performed_at);
-CREATE TABLE IF NOT EXISTS nutrition_reports (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  report_date TEXT NOT NULL,
-  breakfast TEXT,
-  lunch TEXT,
-  dinner TEXT,
-  snacks TEXT,
-  day_type TEXT,
-  pre_workout_meal TEXT,
-  post_workout_meal TEXT,
-  calories REAL,
-  protein_g REAL,
-  carbs_g REAL,
-  fats_g REAL,
-  notes TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS progress_reports (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  report_date TEXT NOT NULL,
-  total_sessions INTEGER DEFAULT 0,
-  streak_days INTEGER DEFAULT 0,
-  total_volume REAL DEFAULT 0,
-  notes TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS workout_plan_docs (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  plan_date TEXT NOT NULL,
-  title TEXT,
-  content_md TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_plan_user_date ON workout_plan_docs(user_id, plan_date);
-CREATE TABLE IF NOT EXISTS analyses (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  plan_date TEXT NOT NULL,
-  content_md TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS bookings (
-  id TEXT PRIMARY KEY,
-  customer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pt_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  scheduled_at TEXT NOT NULL,
-  duration_minutes INTEGER NOT NULL DEFAULT 60,
-  notes TEXT,
-  cancelled_by TEXT,
-  cancellation_reason TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_bookings_customer ON bookings(customer_id);
-CREATE INDEX IF NOT EXISTS idx_bookings_pt ON bookings(pt_id);
-CREATE TABLE IF NOT EXISTS support_tickets (
-  id TEXT PRIMARY KEY,
-  customer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  subject TEXT NOT NULL,
-  message TEXT NOT NULL,
-  source TEXT NOT NULL DEFAULT 'customer',
-  status TEXT NOT NULL DEFAULT 'open',
-  assigned_staff_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-  assigned_pt_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-  resolution_notes TEXT,
-  resolved_at TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_support_customer ON support_tickets(customer_id);
-CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status);
-CREATE INDEX IF NOT EXISTS idx_support_staff ON support_tickets(assigned_staff_id);
-CREATE INDEX IF NOT EXISTS idx_support_pt ON support_tickets(assigned_pt_id);
-CREATE TABLE IF NOT EXISTS group_classes (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT,
-  level TEXT,
-  active INTEGER NOT NULL DEFAULT 1,
-  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS group_class_sessions (
-  id TEXT PRIMARY KEY,
-  class_id TEXT NOT NULL REFERENCES group_classes(id) ON DELETE CASCADE,
-  trainer_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-  starts_at TEXT NOT NULL,
-  duration_minutes INTEGER NOT NULL DEFAULT 60,
-  capacity INTEGER NOT NULL DEFAULT 12,
-  status TEXT NOT NULL DEFAULT 'scheduled',
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_group_sessions_class ON group_class_sessions(class_id);
-CREATE INDEX IF NOT EXISTS idx_group_sessions_trainer ON group_class_sessions(trainer_id);
-CREATE INDEX IF NOT EXISTS idx_group_sessions_starts ON group_class_sessions(starts_at);
-CREATE TABLE IF NOT EXISTS group_class_bookings (
-  id TEXT PRIMARY KEY,
-  session_id TEXT NOT NULL REFERENCES group_class_sessions(id) ON DELETE CASCADE,
-  customer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  status TEXT NOT NULL DEFAULT 'booked',
-  attended_at TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(session_id, customer_id)
-);
-CREATE INDEX IF NOT EXISTS idx_group_bookings_session ON group_class_bookings(session_id);
-CREATE INDEX IF NOT EXISTS idx_group_bookings_customer ON group_class_bookings(customer_id);
-CREATE TABLE IF NOT EXISTS chat_threads (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  title TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_threads_user ON chat_threads(user_id);
-CREATE TABLE IF NOT EXISTS chat_messages (
-  id TEXT PRIMARY KEY,
-  thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
-  role TEXT NOT NULL,
-  content_json TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_msg_thread ON chat_messages(thread_id);
-CREATE TABLE IF NOT EXISTS inbody_reports (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  report_date TEXT NOT NULL,
-  weight_kg REAL NOT NULL,
-  muscle_mass_kg REAL NOT NULL,
-  body_fat_percent REAL NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS community_feed (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
-  image_base64 TEXT,
-  likes_count INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS progress_photos (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  image_base64 TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-`;
-sqlite.exec(ddl);
+function withoutUnsupportedPgMemTypes(config: unknown) {
+  if (!config || typeof config !== "object") return config;
+  if (!("types" in config) && !("rowMode" in config)) return config;
+  const { types: _types, rowMode: _rowMode, ...queryConfig } = config as Record<string, unknown>;
+  return queryConfig;
+}
 
-// Lightweight column migrations for local SQLite.
-try {
-  sqlite.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'customer'");
-} catch {}
-try {
-  sqlite.exec("ALTER TABLE users ADD COLUMN assigned_pt_id TEXT");
-} catch {}
-try {
-  sqlite.exec("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)");
-} catch {}
-try {
-  sqlite.exec("CREATE INDEX IF NOT EXISTS idx_users_assigned_pt ON users(assigned_pt_id)");
-} catch {}
+function wantsArrayRows(config: unknown) {
+  return Boolean(
+    config &&
+      typeof config === "object" &&
+      "rowMode" in config &&
+      (config as { rowMode?: unknown }).rowMode === "array",
+  );
+}
 
-export const db = drizzle(sqlite, { schema });
+function adaptPgMemRows(config: unknown, result: unknown) {
+  if (!wantsArrayRows(config) || !result || typeof result !== "object" || !("rows" in result)) {
+    return result;
+  }
+
+  const typedResult = result as { rows: unknown[]; fields?: Array<{ name: string }> };
+  typedResult.rows = typedResult.rows.map((row) => {
+    if (Array.isArray(row) || !row || typeof row !== "object") return row;
+    const record = row as Record<string, unknown>;
+    const names = typedResult.fields?.map((field) => field.name) ?? Object.keys(record);
+    if (
+      names.length !== Object.keys(record).length ||
+      !names.every((name) => Object.prototype.hasOwnProperty.call(record, name))
+    ) {
+      return Object.values(record);
+    }
+    return names.map((name) => record[name]);
+  });
+  return typedResult;
+}
+
+function patchPgMemQueryTarget<T extends { query: (...args: unknown[]) => unknown }>(target: T): T {
+  const query = target.query.bind(target);
+  target.query = ((config: unknown, ...args: unknown[]) => {
+    const result = query(withoutUnsupportedPgMemTypes(config), ...args);
+    if (result && typeof result === "object" && "then" in result) {
+      return (result as Promise<unknown>).then((value) => adaptPgMemRows(config, value));
+    }
+    return adaptPgMemRows(config, result);
+  }) as T["query"];
+  return target;
+}
+
+function patchPgMemPool<T extends { connect: (...args: unknown[]) => Promise<unknown> } & {
+  query: (...args: unknown[]) => unknown;
+}>(pool: T): T {
+  patchPgMemQueryTarget(pool);
+  const connect = pool.connect.bind(pool);
+  pool.connect = (async (...args: unknown[]) => {
+    const client = await connect(...args);
+    if (client && typeof client === "object" && "query" in client) {
+      return patchPgMemQueryTarget(client as { query: (...queryArgs: unknown[]) => unknown });
+    }
+    return client;
+  }) as T["connect"];
+  return pool;
+}
+
+function createPool(): pg.Pool {
+  if (isTestRuntime) return createMemoryPool();
+  return new pg.Pool({
+    connectionString: process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL,
+    max: 10,
+  });
+}
+
+export const pool = createPool();
+export const db = drizzle(pool, { schema });
+
+await migrate(db, { migrationsFolder });
+
+export async function resetDatabaseForTests() {
+  if (!isTestRuntime) {
+    throw new Error("resetDatabaseForTests can only run in Vitest/test mode");
+  }
+
+  await db.execute(sql`
+    TRUNCATE TABLE
+      audit_logs,
+      manual_payments,
+      memberships,
+      purchase_requests,
+      public_events,
+      promotions,
+      pt_service_offerings,
+      pt_profiles,
+      service_offerings,
+      membership_plans,
+      branches,
+      progress_photos,
+      community_feed,
+      inbody_reports,
+      chat_messages,
+      chat_threads,
+      analyses,
+      workout_plan_docs,
+      group_class_bookings,
+      group_class_sessions,
+      group_classes,
+      support_tickets,
+      pt_unavailable_days,
+      guest_meetings,
+      bookings,
+      progress_reports,
+      nutrition_reports,
+      workout_logs,
+      profiles,
+      sessions,
+      users
+    RESTART IDENTITY CASCADE
+  `);
+}
+
 export { schema };

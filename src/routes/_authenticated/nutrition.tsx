@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Apple, ChevronRight, Droplet, Flame, Sparkles, Utensils } from "lucide-react";
+import { Apple, ChevronRight, Flame, Loader2, RotateCcw, Sparkles, Utensils } from "lucide-react";
 import { formatDate } from "@/lib/format";
+import { buildNutritionExperience } from "@/lib/customer-experience";
 import type { listNutritionReports } from "@/lib/nutrition.functions";
 
 export const Route = createFileRoute("/_authenticated/nutrition")({
-  head: () => ({ meta: [{ title: "Nutrition — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Nutrition - HL Fitness" }] }),
   component: Nutrition,
 });
+
 type Row = Awaited<ReturnType<typeof listNutritionReports>>[number];
 type DayType = "Workout day" | "Rest day" | "Cheat day";
 
@@ -59,15 +61,70 @@ const EMPTY: FormState = {
   fatsG: "",
 };
 
+const MEAL_FIELDS = [
+  {
+    key: "breakfast",
+    label: "Breakfast",
+    placeholder: "Greek yogurt, berries, oats",
+    hint: "First meal",
+  },
+  {
+    key: "lunch",
+    label: "Lunch",
+    placeholder: "Chicken bowl, salad",
+    hint: "Midday fuel",
+  },
+  {
+    key: "dinner",
+    label: "Dinner",
+    placeholder: "Salmon, rice, greens",
+    hint: "Evening meal",
+  },
+  {
+    key: "snacks",
+    label: "Snacks",
+    placeholder: "Protein bar, fruit",
+    hint: "Small bites",
+  },
+  {
+    key: "preWorkoutMeal",
+    label: "Pre-workout",
+    placeholder: "Banana, espresso",
+    hint: "Before training",
+  },
+  {
+    key: "postWorkoutMeal",
+    label: "Post-workout",
+    placeholder: "Shake, oats",
+    hint: "Recovery",
+  },
+] satisfies Array<{
+  key: keyof Pick<
+    FormState,
+    "breakfast" | "lunch" | "dinner" | "snacks" | "preWorkoutMeal" | "postWorkoutMeal"
+  >;
+  label: string;
+  placeholder: string;
+  hint: string;
+}>;
+
+const alexNutritionPrompt =
+  "Build a simple meal plan for this week using my recent nutrition logs and training goal.";
+
 function Nutrition() {
   const [rows, setRows] = useState<Row[]>([]);
   const [f, setF] = useState<FormState>(EMPTY);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const list = useCallback(async () => {
     const res = await fetch("/api/log/nutrition-report", { credentials: "include" });
-    if (!res.ok) return [];
-    return res.json();
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? "Unable to load nutrition logs");
+    }
+    return res.json() as Promise<Row[]>;
   }, []);
 
   const save = async (payload: { data: Record<string, unknown> }) => {
@@ -84,36 +141,47 @@ function Nutrition() {
     return res.json();
   };
 
-  const load = useCallback(async () => setRows(await list()), [list]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setRows(await list());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load nutrition logs";
+      setLoadError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [list]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const latest = rows[0] ?? null;
-  const latestMeals = useMemo(() => {
-    if (!latest) return [];
-    return [
-      { label: "Breakfast", value: latest.breakfast },
-      { label: "Lunch", value: latest.lunch },
-      { label: "Dinner", value: latest.dinner },
-      { label: "Snacks", value: latest.snacks },
-      { label: "Pre-workout", value: latest.preWorkoutMeal },
-      { label: "Post-workout", value: latest.postWorkoutMeal },
-    ].filter((item) => item.value);
-  }, [latest]);
+  const summary = useMemo(
+    () =>
+      buildNutritionExperience({
+        today: new Date().toISOString().slice(0, 10),
+        reports: rows,
+      }),
+    [rows],
+  );
+
+  const liveMacroSummary = useMemo(
+    () => ({
+      calories: parseOptionalNumber(f.calories),
+      proteinG: parseOptionalNumber(f.proteinG),
+      carbsG: parseOptionalNumber(f.carbsG),
+      fatsG: parseOptionalNumber(f.fatsG),
+    }),
+    [f.calories, f.carbsG, f.fatsG, f.proteinG],
+  );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
-    const hasMeals = [
-      f.breakfast,
-      f.lunch,
-      f.dinner,
-      f.snacks,
-      f.preWorkoutMeal,
-      f.postWorkoutMeal,
-    ].some((m) => m.trim());
+    const hasMeals = MEAL_FIELDS.some((field) => f[field.key].trim());
     const hasNotes = f.notes.trim().length > 0;
     const hasManualMacros = [f.calories, f.proteinG, f.carbsG, f.fatsG].some((m) => m.trim());
     if (f.estimateMacros && !hasMeals) {
@@ -125,11 +193,6 @@ function Nutrition() {
       return;
     }
 
-    const num = (value: string) => {
-      if (!value.trim()) return null;
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    };
     setBusy(true);
     try {
       const r = await save({
@@ -144,14 +207,14 @@ function Nutrition() {
           postWorkoutMeal: f.postWorkoutMeal || null,
           notes: f.notes || null,
           estimateMacros: f.estimateMacros,
-          calories: num(f.calories),
-          proteinG: num(f.proteinG),
-          carbsG: num(f.carbsG),
-          fatsG: num(f.fatsG),
+          calories: parseOptionalNumber(f.calories),
+          proteinG: parseOptionalNumber(f.proteinG),
+          carbsG: parseOptionalNumber(f.carbsG),
+          fatsG: parseOptionalNumber(f.fatsG),
         },
       });
-      toast.success(r.macros?.calories ? `Saved - ~${r.macros.calories} kcal` : "Report saved");
-      setF(EMPTY);
+      toast.success(r.macros?.calories ? `Saved: ~${r.macros.calories} kcal` : "Report saved");
+      setF({ ...EMPTY, reportDate: new Date().toISOString().slice(0, 10) });
       load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
@@ -160,58 +223,56 @@ function Nutrition() {
     }
   };
 
-  const renderMacro = (value: number | null, suffix: string) =>
-    typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)}${suffix}` : "-";
+  const macroSource = f.estimateMacros ? summary.latestMacros : liveMacroSummary;
 
   return (
-    <div className="mx-auto max-w-5xl p-4 md:p-8 pb-24 md:pb-8">
+    <div className="mx-auto max-w-6xl p-4 pb-24 md:p-8">
       <PageHeader
         title="Nutrition"
-        subtitle="Log your day, then let Alex estimate macros or enter your own."
+        subtitle="Log meals quickly, keep macros readable, and give Alex better coaching context."
         action={
           <Button
             asChild
             variant="outline"
-            className="border-white/10 text-slate-200 hover:text-yellow-200 hover:border-yellow-500/30"
+            className="w-full border-white/10 text-slate-200 hover:border-primary/30 hover:text-primary sm:w-auto"
           >
-            <Link to="/trainer">
-              AI Meal Plan <ChevronRight className="size-4 ml-1" />
-            </Link>
+            <a href={`/trainer?prompt=${encodeURIComponent(alexNutritionPrompt)}`}>
+              Generate with Alex
+              <ChevronRight className="ml-1 size-4" />
+            </a>
           </Button>
         }
       />
 
-      <div className="grid lg:grid-cols-[1.1fr,0.9fr] gap-6">
+      <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <form
             onSubmit={submit}
-            className="rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top,_rgba(250,204,21,0.12),_rgba(0,0,0,0)_55%)] bg-black/40 backdrop-blur p-6 shadow-[0_30px_80px_-50px_rgba(250,204,21,0.6)] animate-fade-up"
+            className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 shadow-[0_30px_80px_-55px_rgba(250,204,21,0.55)] sm:p-6"
           >
-            <div className="flex items-center justify-between mb-5">
+            <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="text-xs uppercase tracking-[0.3em] text-yellow-300">Daily log</div>
-                <h2 className="text-xl font-semibold text-slate-100 mt-2">Log meals</h2>
-                <p className="text-sm text-slate-300">
-                  Quick entries now, detailed insights later.
+                <div className="text-xs font-medium text-primary">Daily log</div>
+                <h2 className="mt-2 text-xl font-semibold text-slate-100">Build today by meals</h2>
+                <p className="mt-1 max-w-xl text-sm leading-6 text-slate-300">
+                  Add what you remember. One useful note is better than a perfect blank day.
                 </p>
               </div>
-              <div className="size-12 rounded-2xl bg-yellow-400/15 text-yellow-300 grid place-items-center">
+              <div className="grid size-12 place-items-center rounded-2xl bg-primary/15 text-primary">
                 <Utensils className="size-5" />
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Date</Label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Date">
                 <Input
                   type="date"
                   value={f.reportDate}
                   onChange={(e) => setF({ ...f, reportDate: e.target.value })}
                   required
                 />
-              </div>
-              <div className="space-y-1">
-                <Label>Day type</Label>
+              </Field>
+              <Field label="Day type">
                 <Select
                   value={f.dayType}
                   onValueChange={(v) => setF({ ...f, dayType: v as DayType })}
@@ -225,73 +286,43 @@ function Nutrition() {
                     <SelectItem value="Cheat day">Cheat day</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Breakfast</Label>
-                <Input
-                  value={f.breakfast}
-                  onChange={(e) => setF({ ...f, breakfast: e.target.value })}
-                  placeholder="Greek yogurt, berries"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Lunch</Label>
-                <Input
-                  value={f.lunch}
-                  onChange={(e) => setF({ ...f, lunch: e.target.value })}
-                  placeholder="Chicken bowl, salad"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Dinner</Label>
-                <Input
-                  value={f.dinner}
-                  onChange={(e) => setF({ ...f, dinner: e.target.value })}
-                  placeholder="Salmon, rice, greens"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Snacks</Label>
-                <Input
-                  value={f.snacks}
-                  onChange={(e) => setF({ ...f, snacks: e.target.value })}
-                  placeholder="Protein bar"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Pre-workout</Label>
-                <Input
-                  value={f.preWorkoutMeal}
-                  onChange={(e) => setF({ ...f, preWorkoutMeal: e.target.value })}
-                  placeholder="Banana, espresso"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Post-workout</Label>
-                <Input
-                  value={f.postWorkoutMeal}
-                  onChange={(e) => setF({ ...f, postWorkoutMeal: e.target.value })}
-                  placeholder="Shake, oats"
-                />
-              </div>
+              </Field>
             </div>
 
-            <div className="mt-4 space-y-1">
-              <Label>Notes</Label>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {MEAL_FIELDS.map((field) => (
+                <div
+                  key={field.key}
+                  className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <Label>{field.label}</Label>
+                    <span className="text-[11px] text-slate-500">{field.hint}</span>
+                  </div>
+                  <Input
+                    value={f[field.key]}
+                    onChange={(e) => setF({ ...f, [field.key]: e.target.value })}
+                    placeholder={field.placeholder}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <Field label="Notes" className="mt-4">
               <Textarea
-                rows={2}
+                rows={3}
                 value={f.notes}
                 onChange={(e) => setF({ ...f, notes: e.target.value })}
-                placeholder="Energy levels, cravings, timing"
+                placeholder="Energy, cravings, timing, digestion, hunger"
               />
-            </div>
+            </Field>
 
-            <div className="mt-5 rounded-2xl border border-white/10 bg-black/40 p-4">
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-slate-100">Estimate macros with AI</div>
-                  <div className="text-xs text-slate-400">
-                    Turn off to enter your own calories and macros.
+                  <div className="mt-1 text-xs leading-5 text-slate-400">
+                    Turn this off when you already know the totals.
                   </div>
                 </div>
                 <Switch
@@ -300,213 +331,369 @@ function Nutrition() {
                 />
               </div>
               <div
-                className={`mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 ${f.estimateMacros ? "opacity-60" : ""}`}
+                className={`mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 ${
+                  f.estimateMacros ? "opacity-60" : ""
+                }`}
               >
-                <div className="space-y-1">
-                  <Label>Calories</Label>
-                  <Input
-                    type="number"
-                    step="1"
-                    value={f.calories}
-                    disabled={f.estimateMacros}
-                    onChange={(e) => setF({ ...f, calories: e.target.value })}
-                    placeholder={f.estimateMacros ? "AI will estimate" : "e.g. 2100"}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Protein (g)</Label>
-                  <Input
-                    type="number"
-                    step="1"
-                    value={f.proteinG}
-                    disabled={f.estimateMacros}
-                    onChange={(e) => setF({ ...f, proteinG: e.target.value })}
-                    placeholder={f.estimateMacros ? "AI will estimate" : "e.g. 160"}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Carbs (g)</Label>
-                  <Input
-                    type="number"
-                    step="1"
-                    value={f.carbsG}
-                    disabled={f.estimateMacros}
-                    onChange={(e) => setF({ ...f, carbsG: e.target.value })}
-                    placeholder={f.estimateMacros ? "AI will estimate" : "e.g. 220"}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Fats (g)</Label>
-                  <Input
-                    type="number"
-                    step="1"
-                    value={f.fatsG}
-                    disabled={f.estimateMacros}
-                    onChange={(e) => setF({ ...f, fatsG: e.target.value })}
-                    placeholder={f.estimateMacros ? "AI will estimate" : "e.g. 70"}
-                  />
-                </div>
+                <MacroInput
+                  label="Calories"
+                  value={f.calories}
+                  disabled={f.estimateMacros}
+                  placeholder={f.estimateMacros ? "AI estimate" : "2100"}
+                  onChange={(value) => setF({ ...f, calories: value })}
+                />
+                <MacroInput
+                  label="Protein (g)"
+                  value={f.proteinG}
+                  disabled={f.estimateMacros}
+                  placeholder={f.estimateMacros ? "AI estimate" : "160"}
+                  onChange={(value) => setF({ ...f, proteinG: value })}
+                />
+                <MacroInput
+                  label="Carbs (g)"
+                  value={f.carbsG}
+                  disabled={f.estimateMacros}
+                  placeholder={f.estimateMacros ? "AI estimate" : "220"}
+                  onChange={(value) => setF({ ...f, carbsG: value })}
+                />
+                <MacroInput
+                  label="Fats (g)"
+                  value={f.fatsG}
+                  disabled={f.estimateMacros}
+                  placeholder={f.estimateMacros ? "AI estimate" : "70"}
+                  onChange={(value) => setF({ ...f, fatsG: value })}
+                />
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button
                 type="submit"
                 disabled={busy}
-                className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
               >
                 {busy ? (
                   <>
-                    <Sparkles className="size-4 mr-1.5 animate-spin" />
-                    Saving...
+                    <Loader2 className="mr-1.5 size-4 animate-spin" />
+                    Saving
                   </>
                 ) : (
                   <>
-                    <Sparkles className="size-4 mr-1.5" />
+                    <Sparkles className="mr-1.5 size-4" />
                     Save log
                   </>
                 )}
               </Button>
-              <div className="text-xs text-slate-400">
-                Your latest entry shows up in the snapshot panel.
-              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full text-slate-300 hover:text-slate-100 sm:w-auto"
+                onClick={() =>
+                  setF({ ...EMPTY, reportDate: new Date().toISOString().slice(0, 10) })
+                }
+              >
+                <RotateCcw className="mr-2 size-4" />
+                Reset
+              </Button>
             </div>
           </form>
 
-          <div className="rounded-3xl border border-white/10 bg-black/40 backdrop-blur p-6 animate-fade-up">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">History</div>
-                <h3 className="text-lg font-semibold text-slate-100 mt-2">Recent logs</h3>
-              </div>
-              <div className="size-10 rounded-2xl bg-white/5 border border-white/10 grid place-items-center text-slate-300">
-                <Apple className="size-5" />
-              </div>
-            </div>
-            <div className="space-y-3">
-              {rows.length === 0 && (
-                <div className="text-sm text-slate-400 text-center py-8">No logs yet.</div>
-              )}
-              {rows.map((r) => (
-                <div
-                  key={r.id}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/10"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-slate-100">
-                      {formatDate(r.reportDate)}
-                      <span className="text-xs text-slate-400 font-normal">
-                        {" "}
-                        - {r.dayType ?? "-"}
-                      </span>
-                    </div>
-                    <div className="text-xs text-yellow-200">
-                      {renderMacro(r.calories, " kcal")}
-                    </div>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    P {renderMacro(r.proteinG, "g")} | C {renderMacro(r.carbsG, "g")} | F{" "}
-                    {renderMacro(r.fatsG, "g")}
-                  </div>
-                  {(r.breakfast || r.lunch || r.dinner || r.snacks) && (
-                    <div className="text-xs mt-2 text-slate-400">
-                      {[r.breakfast, r.lunch, r.dinner, r.snacks].filter(Boolean).join(" | ")}
-                    </div>
-                  )}
-                  {r.notes && <div className="text-xs mt-2 italic text-slate-300">{r.notes}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
+          <HistoryPanel
+            rows={rows}
+            loading={loading}
+            loadError={loadError}
+            onRetry={load}
+            renderMacro={renderMacro}
+          />
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-black/40 backdrop-blur p-6 shadow-[0_25px_60px_-50px_rgba(59,130,246,0.45)] animate-fade-up">
-            <div className="flex items-center justify-between mb-4">
+        <aside className="space-y-6">
+          <MacroPanel
+            title={f.estimateMacros ? "Latest macro snapshot" : "Manual macro preview"}
+            subtitle={
+              f.estimateMacros
+                ? summary.latest
+                  ? `From ${formatDate(summary.latest.reportDate)}`
+                  : "No macro data yet"
+                : "From the numbers you are entering"
+            }
+            macros={macroSource}
+          />
+
+          <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5">
+            <div className="mb-4 flex items-center justify-between">
               <div>
-                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Snapshot</div>
-                <h3 className="text-lg font-semibold text-slate-100 mt-2">
-                  {latest ? `Latest: ${formatDate(latest.reportDate)}` : "No data yet"}
+                <div className="text-xs text-slate-400">Week rhythm</div>
+                <h3 className="mt-2 text-lg font-semibold text-slate-100">
+                  {summary.weekLogCount} day{summary.weekLogCount === 1 ? "" : "s"} logged
                 </h3>
               </div>
-              <div className="size-10 rounded-2xl bg-blue-400/15 text-blue-200 grid place-items-center">
+              <div className="grid size-10 place-items-center rounded-2xl bg-primary/15 text-primary">
                 <Flame className="size-5" />
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-slate-400">Calories</div>
-                <div className="text-lg font-semibold text-slate-100">
-                  {renderMacro(latest?.calories ?? null, " kcal")}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-slate-400">Protein</div>
-                <div className="text-lg font-semibold text-slate-100">
-                  {renderMacro(latest?.proteinG ?? null, "g")}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-slate-400">Carbs</div>
-                <div className="text-lg font-semibold text-slate-100">
-                  {renderMacro(latest?.carbsG ?? null, "g")}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-slate-400">Fats</div>
-                <div className="text-lg font-semibold text-slate-100">
-                  {renderMacro(latest?.fatsG ?? null, "g")}
-                </div>
-              </div>
-            </div>
+            <MacroPanelBody macros={summary.averageMacros} compact />
+            <p className="mt-4 text-sm leading-6 text-slate-400">
+              Average from nutrition logs in the last 7 days.
+            </p>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-black/40 backdrop-blur p-6 animate-fade-up">
-            <div className="flex items-center justify-between mb-4">
+          <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5">
+            <div className="mb-4 flex items-center justify-between">
               <div>
-                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Meals</div>
-                <h3 className="text-lg font-semibold text-slate-100 mt-2">Latest meals</h3>
+                <div className="text-xs text-slate-400">Latest meals</div>
+                <h3 className="mt-2 text-lg font-semibold text-slate-100">
+                  {summary.latest ? formatDate(summary.latest.reportDate) : "Nothing logged yet"}
+                </h3>
               </div>
-              <div className="size-10 rounded-2xl bg-yellow-400/15 text-yellow-200 grid place-items-center">
+              <div className="grid size-10 place-items-center rounded-2xl bg-white/[0.05] text-slate-300">
                 <Apple className="size-5" />
               </div>
             </div>
 
-            {latestMeals.length === 0 ? (
-              <div className="text-sm text-slate-400">Log a meal to see it here.</div>
+            {loading ? (
+              <LoadingRows />
+            ) : summary.latestMeals.length === 0 ? (
+              <EmptyBlock
+                title="No meals to show"
+                detail="Save a meal, snack, or note and this panel becomes your quick review."
+              />
             ) : (
               <div className="space-y-3">
-                {latestMeals.map((meal) => (
-                  <div
-                    key={meal.label}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                  >
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                      {meal.label}
-                    </div>
-                    <div className="text-sm text-slate-100 mt-1">{meal.value}</div>
+                {summary.latestMeals.map((meal) => (
+                  <div key={meal.label} className="rounded-xl bg-white/[0.05] p-3">
+                    <div className="text-xs text-slate-500">{meal.label}</div>
+                    <div className="mt-1 text-sm text-slate-100">{meal.value}</div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-black/40 to-emerald-400/10 p-6 animate-fade-up">
-            <div className="flex items-center gap-3">
-              <div className="size-10 rounded-2xl bg-emerald-400/15 text-emerald-200 grid place-items-center">
-                <Droplet className="size-5" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-slate-100">Fuel reminder</div>
-                <div className="text-xs text-slate-300">
-                  Balance protein and hydration to recover faster.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        </aside>
       </div>
     </div>
   );
+}
+
+function Field({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`space-y-1 ${className ?? ""}`}>
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function MacroInput({
+  label,
+  value,
+  disabled,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field label={label}>
+      <Input
+        type="number"
+        step="1"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    </Field>
+  );
+}
+
+function MacroPanel({
+  title,
+  subtitle,
+  macros,
+}: {
+  title: string;
+  subtitle: string;
+  macros: {
+    calories: number | null;
+    proteinG: number | null;
+    carbsG: number | null;
+    fatsG: number | null;
+  };
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 shadow-[0_25px_60px_-50px_rgba(59,130,246,0.45)]">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <div className="text-xs text-slate-400">{subtitle}</div>
+          <h3 className="mt-2 text-lg font-semibold text-slate-100">{title}</h3>
+        </div>
+        <div className="grid size-10 place-items-center rounded-2xl bg-blue-400/15 text-blue-200">
+          <Flame className="size-5" />
+        </div>
+      </div>
+      <MacroPanelBody macros={macros} />
+    </div>
+  );
+}
+
+function MacroPanelBody({
+  macros,
+  compact = false,
+}: {
+  macros: {
+    calories: number | null;
+    proteinG: number | null;
+    carbsG: number | null;
+    fatsG: number | null;
+  };
+  compact?: boolean;
+}) {
+  return (
+    <div className={`grid grid-cols-2 gap-3 ${compact ? "md:grid-cols-4" : ""}`}>
+      <MacroTile label="Calories" value={renderMacro(macros.calories, " kcal")} />
+      <MacroTile label="Protein" value={renderMacro(macros.proteinG, "g")} />
+      <MacroTile label="Carbs" value={renderMacro(macros.carbsG, "g")} />
+      <MacroTile label="Fats" value={renderMacro(macros.fatsG, "g")} />
+    </div>
+  );
+}
+
+function MacroTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3">
+      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className="mt-1 text-base font-semibold text-slate-100">{value}</div>
+    </div>
+  );
+}
+
+function HistoryPanel({
+  rows,
+  loading,
+  loadError,
+  onRetry,
+  renderMacro,
+}: {
+  rows: Row[];
+  loading: boolean;
+  loadError: string | null;
+  onRetry: () => void;
+  renderMacro: (value: number | null, suffix: string) => string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <div className="text-xs text-slate-400">History</div>
+          <h3 className="mt-2 text-lg font-semibold text-slate-100">Recent logs</h3>
+        </div>
+        <div className="grid size-10 place-items-center rounded-2xl bg-white/[0.05] text-slate-300">
+          <Apple className="size-5" />
+        </div>
+      </div>
+
+      {loading ? (
+        <LoadingRows />
+      ) : loadError ? (
+        <EmptyBlock
+          title="Nutrition logs could not load"
+          detail={loadError}
+          action={
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              Try again
+            </Button>
+          }
+        />
+      ) : rows.length === 0 ? (
+        <EmptyBlock
+          title="No logs yet"
+          detail="Start with one meal or note. Alex can work with partial days."
+        />
+      ) : (
+        <div className="space-y-3">
+          {rows.map((r) => (
+            <div
+              key={r.id}
+              className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/10"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-100">{formatDate(r.reportDate)}</div>
+                  <div className="mt-1 text-xs text-slate-400">
+                    {r.dayType ?? "Day type not set"}
+                  </div>
+                </div>
+                <div className="text-xs font-medium text-primary">
+                  {renderMacro(r.calories, " kcal")}
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-slate-400">
+                P {renderMacro(r.proteinG, "g")} | C {renderMacro(r.carbsG, "g")} | F{" "}
+                {renderMacro(r.fatsG, "g")}
+              </div>
+              {(r.breakfast || r.lunch || r.dinner || r.snacks) && (
+                <div className="mt-2 line-clamp-2 text-xs text-slate-400">
+                  {[r.breakfast, r.lunch, r.dinner, r.snacks].filter(Boolean).join(" | ")}
+                </div>
+              )}
+              {r.notes && <div className="mt-2 text-xs italic text-slate-300">{r.notes}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LoadingRows() {
+  return (
+    <div className="space-y-3">
+      {[0, 1, 2].map((item) => (
+        <div key={item} className="h-20 animate-pulse rounded-2xl bg-white/[0.05]" />
+      ))}
+    </div>
+  );
+}
+
+function EmptyBlock({
+  title,
+  detail,
+  action,
+}: {
+  title: string;
+  detail: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-5 text-center">
+      <div className="text-sm font-medium text-slate-100">{title}</div>
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-400">{detail}</p>
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+
+function parseOptionalNumber(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function renderMacro(value: number | null, suffix: string) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? `${Math.round(value)}${suffix}`
+    : "-";
 }

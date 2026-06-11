@@ -7,7 +7,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -26,9 +26,7 @@ export const addFeedPost = createServerFn({ method: "POST" })
 
     const id = newId();
     try {
-      db.insert(schema.communityFeed)
-        .values({ id, userId: session.userId, ...data })
-        .run();
+      await db.insert(schema.communityFeed).values({ id, userId: session.userId, ...data });
       return { ok: true, id };
     } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
@@ -41,7 +39,7 @@ export const listFeedPosts = createServerFn({ method: "GET" }).handler(async () 
   const { db, schema } = await import("@/server/db");
   const { eq } = await import("drizzle-orm");
 
-  const rows = db
+  const rows = await db
     .select({
       id: schema.communityFeed.id,
       content: schema.communityFeed.content,
@@ -53,8 +51,7 @@ export const listFeedPosts = createServerFn({ method: "GET" }).handler(async () 
     .from(schema.communityFeed)
     .leftJoin(schema.users, eq(schema.communityFeed.userId, schema.users.id))
     .orderBy(desc(schema.communityFeed.createdAt))
-    .limit(50)
-    .all();
+    .limit(50);
 
   return rows;
 });

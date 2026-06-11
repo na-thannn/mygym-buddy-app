@@ -7,7 +7,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -28,9 +28,7 @@ export const saveInbodyReport = createServerFn({ method: "POST" })
 
     const id = newId();
     try {
-      db.insert(schema.inbodyReports)
-        .values({ id, userId: session.userId, ...data })
-        .run();
+      await db.insert(schema.inbodyReports).values({ id, userId: session.userId, ...data });
       return { ok: true, id };
     } catch (err) {
       await logDevError({ error: err, req: null }).catch(() => {});
@@ -42,10 +40,9 @@ export const listInbodyReports = createServerFn({ method: "GET" }).handler(async
   const session = await requireSession();
   const { db, schema } = await import("@/server/db");
 
-  return db
+  return await db
     .select()
     .from(schema.inbodyReports)
     .where(eq(schema.inbodyReports.userId, session.userId))
-    .orderBy(desc(schema.inbodyReports.reportDate))
-    .all();
+    .orderBy(desc(schema.inbodyReports.reportDate));
 });

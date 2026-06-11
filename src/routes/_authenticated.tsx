@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, Outlet } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
 import { getCurrentUser } from "@/lib/auth.functions";
+import { shouldRedirectForPasswordChange } from "@/lib/password-gate";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -20,6 +21,14 @@ export const Route = createFileRoute("/_authenticated")({
         to: "/auth",
         search: { mode: "login", redirect: location.href, email: "" },
       });
+    }
+    if (
+      shouldRedirectForPasswordChange({
+        mustChangePassword: Boolean(user.mustChangePassword),
+        pathname: location.pathname,
+      })
+    ) {
+      throw redirect({ to: "/change-password" });
     }
   },
   component: () => (

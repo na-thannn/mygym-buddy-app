@@ -6,7 +6,7 @@ import logDevError from "@/lib/error-logger";
 
 type RoleCounts = {
   admin: number;
-  staff: number;
+  manager: number;
   pt: number;
   customer: number;
 };
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/admin/stats")({
   server: {
     handlers: {
       GET: async () => {
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -37,50 +37,47 @@ export const Route = createFileRoute("/api/admin/stats")({
         }
 
         try {
-          const roleRows = db
+          const roleRows = await db
             .select({ role: schema.users.role, count: sql<number>`count(*)` })
             .from(schema.users)
-            .groupBy(schema.users.role)
-            .all();
+            .groupBy(schema.users.role);
 
           const baseCounts: RoleCounts = {
             admin: 0,
-            staff: 0,
+            manager: 0,
             pt: 0,
             customer: 0,
           };
 
           const counts = roleRows.reduce((acc, row) => {
             const role = row.role as keyof RoleCounts;
-            if (role in acc) acc[role] = row.count ?? 0;
+            if (role in acc) acc[role] = Number(row.count ?? 0);
             return acc;
           }, baseCounts);
 
-          const totalUsers = roleRows.reduce((sum, row) => sum + (row.count ?? 0), 0);
+          const totalUsers = roleRows.reduce((sum, row) => sum + Number(row.count ?? 0), 0);
 
-          const bookingRows = db
+          const bookingRows = await db
             .select({ status: schema.bookings.status, count: sql<number>`count(*)` })
             .from(schema.bookings)
-            .groupBy(schema.bookings.status)
-            .all();
+            .groupBy(schema.bookings.status);
 
           const bookingStatusCounts = bookingRows.reduce<Record<string, number>>((acc, row) => {
             acc[row.status] = Number(row.count ?? 0);
             return acc;
           }, {});
 
-          const supportRows = db
+          const supportRows = await db
             .select({ status: schema.supportTickets.status, count: sql<number>`count(*)` })
             .from(schema.supportTickets)
-            .groupBy(schema.supportTickets.status)
-            .all();
+            .groupBy(schema.supportTickets.status);
 
           const supportStatusCounts = supportRows.reduce<Record<string, number>>((acc, row) => {
             acc[row.status] = Number(row.count ?? 0);
             return acc;
           }, {});
 
-          const classStats = db
+          const [classStats] = await db
             .select({
               sessions: sql<number>`count(distinct ${schema.groupClassSessions.id})`,
               enrollments: sql<number>`count(${schema.groupClassBookings.id})`,
@@ -91,37 +88,35 @@ export const Route = createFileRoute("/api/admin/stats")({
               schema.groupClassBookings,
               eq(schema.groupClassSessions.id, schema.groupClassBookings.sessionId),
             )
-            .get();
+            .limit(1);
 
-          const unassignedRow = db
+          const [unassignedRow] = await db
             .select({ count: sql<number>`count(*)` })
             .from(schema.users)
             .where(and(eq(schema.users.role, "customer"), isNull(schema.users.assignedPtId)))
-            .get();
+            .limit(1);
 
-          const pts = db
+          const pts = await db
             .select({
               id: schema.users.id,
               displayName: schema.users.displayName,
               email: schema.users.email,
             })
             .from(schema.users)
-            .where(eq(schema.users.role, "pt"))
-            .all();
+            .where(eq(schema.users.role, "pt"));
 
-          const ptLoads = db
+          const ptLoads = await db
             .select({
               assignedPtId: schema.users.assignedPtId,
               count: sql<number>`count(*)`,
             })
             .from(schema.users)
             .where(eq(schema.users.role, "customer"))
-            .groupBy(schema.users.assignedPtId)
-            .all();
+            .groupBy(schema.users.assignedPtId);
 
           const ptLoadMap = new Map<string, number>();
           for (const row of ptLoads) {
-            if (row.assignedPtId) ptLoadMap.set(row.assignedPtId, row.count ?? 0);
+            if (row.assignedPtId) ptLoadMap.set(row.assignedPtId, Number(row.count ?? 0));
           }
 
           const ptLoadList: PtLoad[] = pts.map((pt) => ({

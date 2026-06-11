@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/log/nutrition-report")({
-  head: () => ({ meta: [{ title: "Nutrition — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Nutrition - HL Fitness" }] }),
   component: NutritionReportRedirect,
 });
 

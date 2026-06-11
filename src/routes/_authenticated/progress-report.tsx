@@ -1,364 +1,470 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, LineChart, Trophy } from "lucide-react";
+import {
+  BadgeCheck,
+  Camera,
+  CalendarDays,
+  ChevronRight,
+  ClipboardList,
+  Dumbbell,
+  FileText,
+  LineChart,
+  Loader2,
+  Scale,
+  Sparkles,
+  Trophy,
+  Utensils,
+} from "lucide-react";
+import { buildWeeklyCheckIn, type WeeklyCheckInItem } from "@/lib/customer-experience";
 import { formatDate } from "@/lib/format";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/progress-report")({
-  head: () => ({ meta: [{ title: "Progress Report — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Weekly Report - HL Fitness" }] }),
   component: ProgressReport,
 });
+
 type WorkoutLog = {
-  id: string;
+  id?: string;
   performedAt: string;
   sets: number | null;
   reps: string | null;
   weightKg: number | null;
 };
 
-type Metrics = {
-  label: string;
-  startDate: string;
-  endDate: string;
-  totalSessions: number;
-  streakDays: number;
-  totalVolume: number;
+type NutritionRow = {
+  reportDate: string;
 };
 
-type StatScales = {
-  sessions: number;
-  streak: number;
-  volume: number;
+type InbodyRow = {
+  reportDate: string;
+  weightKg: number;
+  muscleMassKg: number;
+  bodyFatPercent: number;
 };
 
-const parseYmd = (value: string) => {
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1);
+type PhotoRow = {
+  imageBase64: string;
 };
 
-const formatYmd = (date: Date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+type PlanRow = {
+  id: string;
+  planDate: string;
+  title?: string | null;
+  contentMd: string;
+  createdAt?: string | null;
 };
 
-const addDays = (date: Date, days: number) => {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
+type AnalysisRow = {
+  id: string;
+  planDate: string;
+  contentMd: string;
+  createdAt?: string | null;
 };
 
-const parseReps = (value: string | null) => {
-  if (!value) return null;
-  const nums =
-    value
-      .match(/\d+(?:\.\d+)?/g)
-      ?.map(Number)
-      .filter(Number.isFinite) ?? [];
-  if (nums.length === 0) return null;
-  if (nums.length === 1) return nums[0] ?? null;
-  return (nums[0] + nums[1]) / 2;
-};
-
-const calculateMetrics = (logs: WorkoutLog[], label: string, startDate: Date, endDate: Date) => {
-  const uniqueDates = new Set(logs.map((log) => log.performedAt));
-  const sortedDates = Array.from(uniqueDates).sort();
-  let streakDays = 0;
-  if (sortedDates.length > 0) {
-    let cursor = parseYmd(sortedDates[sortedDates.length - 1]);
-    while (uniqueDates.has(formatYmd(cursor))) {
-      streakDays += 1;
-      cursor = addDays(cursor, -1);
-    }
-  }
-  const totalVolume = logs.reduce((sum, log) => {
-    const sets = log.sets ?? 0;
-    const weight = log.weightKg ?? 0;
-    const reps = parseReps(log.reps) ?? 0;
-    if (!sets || !weight || !reps) return sum;
-    return sum + sets * reps * weight;
-  }, 0);
-
-  return {
-    label,
-    startDate: formatYmd(startDate),
-    endDate: formatYmd(endDate),
-    totalSessions: uniqueDates.size,
-    streakDays,
-    totalVolume,
-  } satisfies Metrics;
-};
+const alexReportPrompt =
+  "Create my weekly check-in using workouts, nutrition, InBody, progress photos, active plan, and recent reviews.";
 
 function ProgressReport() {
-  const [logs, setLogs] = useState<WorkoutLog[]>([]);
+  const [workouts, setWorkouts] = useState<WorkoutLog[]>([]);
+  const [nutritionReports, setNutritionReports] = useState<NutritionRow[]>([]);
+  const [inbodyReports, setInbodyReports] = useState<InbodyRow[]>([]);
+  const [photoCount, setPhotoCount] = useState(0);
+  const [plans, setPlans] = useState<PlanRow[]>([]);
+  const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [analysisBusy, setAnalysisBusy] = useState(false);
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/log/workout?limit=5000", { credentials: "include" });
-    if (!res.ok) return [];
-    return res.json();
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [workoutsRes, nutritionRes, inbodyRes, photosRes, plansRes, analysesRes] =
+        await Promise.all([
+          fetch("/api/log/workout?limit=5000", { credentials: "include" }),
+          fetch("/api/log/nutrition-report", { credentials: "include" }),
+          fetch("/api/inbody", { credentials: "include" }),
+          fetch("/api/progress-photos", { credentials: "include" }),
+          fetch("/api/plans", { credentials: "include" }),
+          fetch("/api/analyses", { credentials: "include" }),
+        ]);
+
+      if (!workoutsRes.ok) throw new Error("Unable to load workout logs");
+
+      setWorkouts(await workoutsRes.json());
+      setNutritionReports(nutritionRes.ok ? await nutritionRes.json() : []);
+      setInbodyReports(inbodyRes.ok ? await inbodyRes.json() : []);
+      const photos = photosRes.ok ? ((await photosRes.json()) as PhotoRow[]) : [];
+      setPhotoCount(photos.length);
+      setPlans(plansRes.ok ? await plansRes.json() : []);
+      setAnalyses(analysesRes.ok ? await analysesRes.json() : []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load weekly report";
+      setLoadError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    load()
-      .then((data) => setLogs(data ?? []))
-      .finally(() => setLoading(false));
+    load();
   }, [load]);
 
-  const reports = useMemo(() => {
-    if (!logs.length) return null;
-    const today = new Date();
-    const endOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const lastWeekStart = addDays(endOfWeek, -6);
-    const earliest = logs.reduce(
-      (min, log) => {
-        const current = parseYmd(log.performedAt);
-        return current < min ? current : min;
-      },
-      parseYmd(logs[0]?.performedAt ?? formatYmd(endOfWeek)),
-    );
-    const firstWeekStart = earliest;
-    const firstWeekEnd = addDays(firstWeekStart, 6);
+  const checkIn = useMemo(
+    () =>
+      buildWeeklyCheckIn({
+        today: new Date().toISOString().slice(0, 10),
+        workouts,
+        nutritionReports,
+        inbodyReports,
+        photoCount,
+        plans,
+        analyses,
+      }),
+    [analyses, inbodyReports, nutritionReports, photoCount, plans, workouts],
+  );
 
-    const inRange = (log: WorkoutLog, start: Date, end: Date) => {
-      const date = parseYmd(log.performedAt);
-      return date >= start && date <= end;
-    };
-
-    const lastWeekLogs = logs.filter((log) => inRange(log, lastWeekStart, endOfWeek));
-    const firstWeekLogs = logs.filter((log) => inRange(log, firstWeekStart, firstWeekEnd));
-
-    const lastWeek = calculateMetrics(lastWeekLogs, "Last 7 days", lastWeekStart, endOfWeek);
-    const firstWeek = calculateMetrics(firstWeekLogs, "First 7 days", firstWeekStart, firstWeekEnd);
-
-    return { lastWeek, firstWeek };
-  }, [logs]);
-
-  const scales = useMemo<StatScales | null>(() => {
-    if (!reports) return null;
-    return {
-      sessions: Math.max(reports.lastWeek.totalSessions, reports.firstWeek.totalSessions, 1),
-      streak: Math.max(reports.lastWeek.streakDays, reports.firstWeek.streakDays, 1),
-      volume: Math.max(reports.lastWeek.totalVolume, reports.firstWeek.totalVolume, 1),
-    };
-  }, [reports]);
-
-  const deltas = useMemo(() => {
-    if (!reports) return null;
-    return {
-      sessions: reports.lastWeek.totalSessions - reports.firstWeek.totalSessions,
-      streak: reports.lastWeek.streakDays - reports.firstWeek.streakDays,
-      volume: reports.lastWeek.totalVolume - reports.firstWeek.totalVolume,
-    };
-  }, [reports]);
-
-  const formatVolume = (value: number) => Math.round(value).toLocaleString("en-US");
-  const formatDelta = (value: number, suffix: string) => {
-    const rounded = Math.round(value);
-    const sign = rounded > 0 ? "+" : rounded < 0 ? "-" : "";
-    return `${sign}${Math.abs(rounded)}${suffix}`;
-  };
-
-  const deltaTone = (value: number) => {
-    if (value > 0) return "up";
-    if (value < 0) return "down";
-    return "flat";
+  const handleWeeklyAnalysis = async () => {
+    if (analysisBusy) return;
+    setAnalysisBusy(true);
+    try {
+      const res = await fetch("/api/weekly-analysis", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ days: 7 }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? "Analysis failed");
+      }
+      toast.success("Weekly analysis ready");
+      navigate({ to: "/analyses" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Analysis failed");
+    } finally {
+      setAnalysisBusy(false);
+    }
   };
 
   return (
-    <div className="mx-auto max-w-5xl p-4 md:p-8 pb-24 md:pb-8">
+    <div className="mx-auto max-w-6xl p-4 pb-24 md:p-8">
       <PageHeader
-        title="Progress Report"
-        subtitle="Auto-calculated from your workout log entries each week."
+        title="Weekly Report"
+        subtitle="A member check-in built from real training, nutrition, InBody, photos, plans, and reviews."
+        action={
+          <Button
+            asChild
+            variant="outline"
+            className="w-full border-white/10 text-slate-200 hover:text-primary sm:w-auto"
+          >
+            <a href={`/trainer?prompt=${encodeURIComponent(alexReportPrompt)}`}>
+              Ask Alex
+              <ChevronRight className="ml-2 size-4" />
+            </a>
+          </Button>
+        }
       />
 
-      {loading && <div className="text-sm text-slate-400">Loading progress...</div>}
-
-      {!loading && logs.length === 0 && (
-        <div className="rounded-3xl border border-white/10 bg-black/40 backdrop-blur p-8 text-center">
-          <div className="text-lg font-semibold text-slate-100">No workouts yet</div>
-          <p className="text-sm text-slate-400 mt-2">
-            Log your first workout and this page will build your weekly progress automatically.
-          </p>
-          <Button asChild className="mt-4 bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
-            <Link to="/log/workout">Log a workout</Link>
-          </Button>
+      {loading ? (
+        <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-6 text-sm text-slate-400">
+          <Loader2 className="mr-2 inline size-4 animate-spin" />
+          Loading weekly check-in
         </div>
-      )}
-
-      {!loading && reports && scales && deltas && (
+      ) : loadError ? (
+        <EmptyState title="Weekly report could not load" detail={loadError} onRetry={load} />
+      ) : workouts.length === 0 && nutritionReports.length === 0 && inbodyReports.length === 0 ? (
+        <EmptyState
+          title="No progress data yet"
+          detail="Log a workout, nutrition day, or InBody report and this page will build your check-in."
+          action={
+            <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Link to="/log/workout">Log a workout</Link>
+            </Button>
+          }
+        />
+      ) : (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-            <ReportCard
-              icon={<LineChart className="size-5" />}
-              accent="bg-yellow-400/15 text-yellow-200"
-              barClass="from-yellow-500/40 via-yellow-400/25 to-transparent"
-              metrics={reports.lastWeek}
-              scales={scales}
-              formatVolume={formatVolume}
-            />
-            <ReportCard
-              icon={<CalendarDays className="size-5" />}
-              accent="bg-emerald-400/15 text-emerald-200"
-              barClass="from-emerald-500/40 via-emerald-400/25 to-transparent"
-              metrics={reports.firstWeek}
-              scales={scales}
-              formatVolume={formatVolume}
-            />
-          </div>
+          <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 shadow-[0_30px_80px_-55px_rgba(250,204,21,0.5)] sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-medium text-primary">
+                    <Sparkles className="size-4" />
+                    Last 7 days
+                  </div>
+                  <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-100">
+                    {checkIn.progress.weekSessions} session
+                    {checkIn.progress.weekSessions === 1 ? "" : "s"} logged
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                    {checkIn.progress.analysisReady
+                      ? "There is enough signal for Alex to write useful coaching feedback."
+                      : "Add another training or nutrition entry to make the review sharper."}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  disabled={analysisBusy}
+                  onClick={handleWeeklyAnalysis}
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+                >
+                  {analysisBusy ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 size-4" />
+                  )}
+                  Generate review
+                </Button>
+              </div>
 
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-black/40 to-blue-400/10 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="size-10 rounded-2xl bg-blue-400/15 text-blue-200 grid place-items-center">
-                <Trophy className="size-5" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-slate-100">Momentum check</div>
-                <div className="text-xs text-slate-400">Last week vs your first week</div>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <StatCard
+                  icon={<Dumbbell className="size-5" />}
+                  label="Month sessions"
+                  value={String(checkIn.progress.monthSessions)}
+                  detail="Last 30 days"
+                />
+                <StatCard
+                  icon={<LineChart className="size-5" />}
+                  label="Week volume"
+                  value={`${checkIn.progress.weekVolumeKg.toLocaleString()}kg`}
+                  detail="Sets x reps x load"
+                />
+                <StatCard
+                  icon={<Utensils className="size-5" />}
+                  label="Nutrition logs"
+                  value={String(checkIn.progress.nutritionLogsThisWeek)}
+                  detail="This week"
+                />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm">
-              <DeltaStat
-                label="Sessions"
-                value={formatDelta(deltas.sessions, "")}
-                tone={deltaTone(deltas.sessions)}
+
+            <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 sm:p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-slate-400">Body trend</div>
+                  <h3 className="mt-2 text-xl font-semibold text-slate-100">
+                    {checkIn.progress.weightTrend.label}
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {checkIn.progress.weightTrend.detail}
+                  </p>
+                </div>
+                <div className="grid size-11 place-items-center rounded-2xl bg-primary/15 text-primary">
+                  <Scale className="size-5" />
+                </div>
+              </div>
+              {checkIn.progress.latestInbody ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <MiniMetric
+                    label="Weight"
+                    value={`${checkIn.progress.latestInbody.weightKg}kg`}
+                  />
+                  <MiniMetric
+                    label="Muscle"
+                    value={`${checkIn.progress.latestInbody.muscleMassKg ?? 0}kg`}
+                  />
+                  <MiniMetric
+                    label="Fat"
+                    value={`${checkIn.progress.latestInbody.bodyFatPercent ?? 0}%`}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
+                  Add an InBody report to include body-composition context.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 sm:p-6">
+              <div className="mb-4">
+                <div className="text-xs text-slate-400">Check-in readiness</div>
+                <h3 className="mt-2 text-lg font-semibold text-slate-100">What Alex can use</h3>
+              </div>
+              <div className="space-y-3">
+                {checkIn.items.map((item) => (
+                  <CheckInItemCard key={item.id} item={item} />
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-6">
+              <ContextCard
+                icon={<ClipboardList className="size-5" />}
+                title="Active plan"
+                label={
+                  checkIn.activePlan
+                    ? checkIn.activePlan.title || `Plan ${checkIn.activePlan.planDate}`
+                    : "No saved plan"
+                }
+                detail={
+                  checkIn.activePlan
+                    ? `Saved for ${formatDate(checkIn.activePlan.planDate)}`
+                    : "Save or generate a plan to compare intent against completed work."
+                }
+                href="/plans"
               />
-              <DeltaStat
-                label="Streak"
-                value={formatDelta(deltas.streak, "d")}
-                tone={deltaTone(deltas.streak)}
+              <ContextCard
+                icon={<FileText className="size-5" />}
+                title="Latest coach review"
+                label={
+                  checkIn.latestAnalysis
+                    ? `Review for ${formatDate(checkIn.latestAnalysis.planDate)}`
+                    : "No review saved"
+                }
+                detail={
+                  checkIn.latestAnalysis
+                    ? "Open Coach Reviews to continue from the latest feedback."
+                    : "Generate a review once training and nutrition data are ready."
+                }
+                href="/analyses"
               />
-              <DeltaStat
-                label="Volume"
-                value={formatDelta(deltas.volume, " kg")}
-                tone={deltaTone(deltas.volume)}
+              <ContextCard
+                icon={<Camera className="size-5" />}
+                title="Progress photos"
+                label={`${photoCount} photo${photoCount === 1 ? "" : "s"} saved`}
+                detail={
+                  photoCount >= 2
+                    ? "Visual comparison is ready for the check-in."
+                    : "Add at least two photos for a better visual check."
+                }
+                href="/progress"
               />
             </div>
-          </div>
+          </section>
         </div>
       )}
     </div>
   );
 }
 
-function ReportCard({
-  metrics,
+function StatCard({
   icon,
-  accent,
-  barClass,
-  scales,
-  formatVolume,
+  label,
+  value,
+  detail,
 }: {
-  metrics: Metrics;
   icon: ReactNode;
-  accent: string;
-  barClass: string;
-  scales: StatScales;
-  formatVolume: (value: number) => string;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-black/40 to-black/60 p-[1px]">
-      <div className="rounded-3xl bg-black/55 backdrop-blur p-5 sm:p-6 shadow-[0_30px_70px_-50px_rgba(250,204,21,0.35)]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.15em] text-slate-300">
-              {metrics.label}
-            </div>
-            <div className="text-base sm:text-lg font-semibold text-slate-100 mt-3 leading-tight">
-              {formatDate(metrics.startDate)} - {formatDate(metrics.endDate)}
-            </div>
-          </div>
-          <div className={`size-10 rounded-2xl grid place-items-center ${accent}`}>{icon}</div>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          <StatRow
-            label="Sessions"
-            value={metrics.totalSessions}
-            suffix=""
-            max={scales.sessions}
-            barClass={barClass}
-          />
-          <StatRow
-            label="Streak"
-            value={metrics.streakDays}
-            suffix="d"
-            max={scales.streak}
-            barClass={barClass}
-          />
-          <StatRow
-            label="Volume"
-            value={metrics.totalVolume}
-            suffix=" kg"
-            max={scales.volume}
-            barClass={barClass}
-            formatter={formatVolume}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatRow({
-  label,
-  value,
-  suffix,
-  max,
-  barClass,
-  formatter,
-}: {
-  label: string;
-  value: number;
-  suffix: string;
-  max: number;
-  barClass: string;
-  formatter?: (value: number) => string;
-}) {
-  const ratio = max > 0 ? Math.min(value / max, 1) : 0;
-  const width = value > 0 ? Math.max(ratio * 100, 14) : 0;
-  const displayValue = formatter ? formatter(value) : Math.round(value).toString();
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-      <div className="absolute inset-y-0 left-0 opacity-70">
-        <div className={`h-full bg-gradient-to-r ${barClass}`} style={{ width: `${width}%` }} />
-      </div>
-      <div className="relative flex items-center justify-between gap-3">
-        <div className="text-[10px] sm:text-xs text-slate-300 uppercase tracking-[0.18em]">
-          {label}
-        </div>
-        <div className="text-base sm:text-lg font-semibold text-slate-100">
-          {displayValue}
-          {suffix}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DeltaStat({
-  label,
-  value,
-  tone,
-}: {
   label: string;
   value: string;
-  tone: "up" | "down" | "flat";
+  detail: string;
 }) {
-  const toneClasses =
-    tone === "up"
-      ? "bg-emerald-400/10 text-emerald-200"
-      : tone === "down"
-        ? "bg-rose-400/10 text-rose-200"
-        : "bg-white/5 text-slate-200";
   return (
-    <div className={`rounded-2xl border border-white/10 p-4 ${toneClasses}`}>
-      <div className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-slate-300">
-        {label}
+    <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+      <div className="grid size-10 place-items-center rounded-xl bg-primary/15 text-primary">
+        {icon}
       </div>
-      <div className="text-lg font-semibold mt-2">{value}</div>
+      <div className="mt-4 text-xs text-slate-400">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-slate-100">{value}</div>
+      <div className="mt-1 text-xs text-slate-500">{detail}</div>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-100">{value}</div>
+    </div>
+  );
+}
+
+function CheckInItemCard({ item }: { item: WeeklyCheckInItem }) {
+  const iconById: Record<WeeklyCheckInItem["id"], ReactNode> = {
+    training: <Dumbbell className="size-4" />,
+    nutrition: <Utensils className="size-4" />,
+    inbody: <Scale className="size-4" />,
+    plan: <ClipboardList className="size-4" />,
+    photos: <Camera className="size-4" />,
+  };
+
+  return (
+    <a
+      href={item.href}
+      className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]"
+    >
+      <div
+        className={`grid size-9 shrink-0 place-items-center rounded-xl ${
+          item.complete ? "bg-emerald-400/15 text-emerald-200" : "bg-white/[0.06] text-slate-400"
+        }`}
+      >
+        {item.complete ? <BadgeCheck className="size-4" /> : iconById[item.id]}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-medium text-slate-100">{item.title}</div>
+          <div className="text-xs text-slate-400">{item.status}</div>
+        </div>
+        <p className="mt-1 text-sm leading-6 text-slate-400">{item.detail}</p>
+      </div>
+    </a>
+  );
+}
+
+function ContextCard({
+  icon,
+  title,
+  label,
+  detail,
+  href,
+}: {
+  icon: ReactNode;
+  title: string;
+  label: string;
+  detail: string;
+  href: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="group flex items-start justify-between gap-4 rounded-2xl border border-white/10 bg-[#111612]/95 p-5 transition hover:bg-white/[0.05]"
+    >
+      <div className="flex min-w-0 gap-3">
+        <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs text-slate-400">{title}</div>
+          <div className="mt-1 truncate text-base font-semibold text-slate-100">{label}</div>
+          <p className="mt-1 text-sm leading-6 text-slate-400">{detail}</p>
+        </div>
+      </div>
+      <ChevronRight className="mt-3 size-5 shrink-0 text-slate-500 transition group-hover:text-primary" />
+    </a>
+  );
+}
+
+function EmptyState({
+  title,
+  detail,
+  action,
+  onRetry,
+}: {
+  title: string;
+  detail: string;
+  action?: ReactNode;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/10 bg-[#111612]/95 p-8 text-center">
+      <Trophy className="mx-auto mb-3 size-8 text-slate-500" />
+      <div className="text-lg font-semibold text-slate-100">{title}</div>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">{detail}</p>
+      {action && <div className="mt-5">{action}</div>}
+      {onRetry && (
+        <Button type="button" variant="outline" size="sm" className="mt-5" onClick={onRetry}>
+          Try again
+        </Button>
+      )}
     </div>
   );
 }

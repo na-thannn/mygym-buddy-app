@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { listRecentWorkouts, logWorkoutEntry } from "@/lib/workout.functions";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
+import { buildWorkoutQuickActions, type WorkoutQuickPatch } from "@/lib/customer-experience";
+import { Dumbbell, RefreshCw, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/log/workout")({
-  head: () => ({ meta: [{ title: "Workout Log — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Workout Log - HL Fitness" }] }),
   component: WorkoutLog,
 });
 
@@ -52,6 +54,8 @@ function WorkoutLog() {
     setRows(data);
   }, [list]);
 
+  const quickActions = useMemo(() => buildWorkoutQuickActions(rows), [rows]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -81,14 +85,78 @@ function WorkoutLog() {
     }
   };
 
+  const applyQuickPatch = (patch: WorkoutQuickPatch) => {
+    setF((current) => ({
+      ...current,
+      ...patch,
+      performedAt: current.performedAt || today(),
+    }));
+  };
+
   return (
-    <div className="max-w-2xl mx-auto p-4 md:p-6">
+    <div className="mx-auto max-w-3xl p-4 pb-24 md:p-6">
       <PageHeader title="Workout Log" subtitle="Capture every completed exercise and session." />
       <form
         onSubmit={submit}
-        className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-4 mb-6 space-y-3 animate-fade-up"
+        className="rounded-2xl border border-white/10 bg-[#111612]/95 p-4 mb-6 space-y-3 animate-fade-up"
       >
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+            <Dumbbell className="size-5" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-100">Fast floor logging</div>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
+              Start from a recent exercise, adjust the numbers, and save the set while it is fresh.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[#080b0a]/45 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+                <Sparkles className="size-4 text-primary" />
+                Quick start
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                Recent exercises appear here after you log them.
+              </p>
+            </div>
+            {quickActions.repeatLatest && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]"
+                onClick={() => applyQuickPatch(quickActions.repeatLatest!.patch)}
+              >
+                <RefreshCw className="mr-2 size-4" />
+                {quickActions.repeatLatest.label}
+              </Button>
+            )}
+          </div>
+          {quickActions.recentExercises.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {quickActions.recentExercises.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => applyQuickPatch(action.patch)}
+                  className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-primary/40 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-xl border border-dashed border-white/10 bg-white/[0.03] p-3 text-xs text-slate-500">
+              Log your first exercise and this panel will become a shortcut list.
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label>Date</Label>
             <Input
@@ -107,7 +175,7 @@ function WorkoutLog() {
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label>Muscle group</Label>
             <Input
@@ -161,26 +229,38 @@ function WorkoutLog() {
             onChange={(e) => setF({ ...f, notes: e.target.value })}
           />
         </div>
-        <Button type="submit" className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
+        <Button
+          type="submit"
+          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+        >
           Save entry
         </Button>
       </form>
 
       <div className="space-y-2">
         {rows.length === 0 && (
-          <div className="text-sm text-slate-400 text-center py-10">No workouts logged yet.</div>
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary/15 text-primary">
+              <Dumbbell className="size-5" />
+            </div>
+            <h3 className="mt-4 text-base font-semibold text-slate-100">No workouts logged yet</h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-400">
+              Save your first exercise above. After that, quick-start buttons will help you repeat
+              common lifts faster.
+            </p>
+          </div>
         )}
         {rows.map((r) => (
           <div
             key={r.id}
-            className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/5"
+            className="rounded-2xl border border-white/10 bg-[#111612]/95 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.05]"
           >
             <div className="font-medium text-sm text-slate-100">{r.exercise}</div>
             <div className="text-xs text-slate-400">
               {formatDate(r.performedAt)}
-              {r.muscleGroup ? ` • ${r.muscleGroup}` : ""}
-              {r.sets && r.reps ? ` • ${r.sets}×${r.reps}` : ""}
-              {r.weightKg ? ` • ${r.weightKg}kg` : ""}
+              {r.muscleGroup ? ` | ${r.muscleGroup}` : ""}
+              {r.sets && r.reps ? ` | ${r.sets}x${r.reps}` : ""}
+              {r.weightKg ? ` | ${r.weightKg}kg` : ""}
             </div>
             {r.notes && <div className="text-xs mt-1 italic text-slate-300">{r.notes}</div>}
           </div>

@@ -14,7 +14,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
@@ -35,11 +35,13 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  if (import.meta.env.DEV) {
+    console.error(error);
+  }
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
@@ -74,14 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "HL Fitness — Training community at 303 Le Thanh Nghi, Da Nang" },
+      { title: "HL Fitness - Training community at 303 Le Thanh Nghi" },
       {
         name: "description",
         content:
-          "Track progress, InBody, and AI coaching for HL Fitness 303 Le Thanh Nghi members.",
+          "Track progress, InBody, and AI coaching for HL Fitness members at 303 Le Thanh Nghi.",
       },
       { name: "author", content: "HL Fitness" },
-      { property: "og:title", content: "HL Fitness — 303 Le Thanh Nghi" },
+      { property: "og:title", content: "HL Fitness - 303 Le Thanh Nghi" },
       {
         property: "og:description",
         content: "Track InBody, workouts, and nutrition with trainer support.",
