@@ -1,33 +1,80 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Activity,
-  Dumbbell,
-  ArrowRight,
   ArrowLeft,
+  ArrowRight,
+  CalendarDays,
   CheckCircle2,
-  User,
+  Clock,
+  Dumbbell,
+  Home,
+  Loader2,
   Trophy,
   Weight,
-  Home,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { KineticSurface, OptimizedPicture } from "@/components/motion/public-funnel-motion";
 
 export const Route = createFileRoute("/get-started")({
-  head: () => ({ meta: [{ title: "Get Started — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Get Started - HL Fitness" }] }),
   component: GetStarted,
 });
 
+type PtOption = {
+  id: string;
+  displayName: string;
+  email: string;
+};
+
+type SlotOption = {
+  scheduledAt: string;
+  label: string;
+};
+
+type OptionsPayload = {
+  pts: PtOption[];
+  slots: SlotOption[];
+  availability: { ptId: string; unavailableSlots: string[] }[];
+};
+
+type SubmitResult = {
+  status: string;
+  emailSent: boolean;
+  assignedPtName: string;
+  usedFallback: boolean;
+};
+
+type CalendarSlot = SlotOption & {
+  timeLabel: string;
+};
+
+type CalendarDay = {
+  key: string;
+  weekday: string;
+  dayNumber: string;
+  month: string;
+  fullLabel: string;
+  slots: CalendarSlot[];
+};
+
 function GetStarted() {
+  const reduceMotion = useReducedMotion();
   const [step, setStep] = useState(1);
+  const [options, setOptions] = useState<OptionsPayload | null>(null);
+  const [result, setResult] = useState<SubmitResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState({
     goal: "",
     experience: "",
     name: "",
     email: "",
     phone: "",
-    ptSession: "",
+    requestedPtId: "",
+    scheduledAt: "",
   });
 
   const goals = [
@@ -36,266 +83,554 @@ function GetStarted() {
     { title: "Overall Fitness", icon: Activity, desc: "Improve endurance and health." },
     { title: "Prepare for Event", icon: Trophy, desc: "Train for a specific sport or event." },
   ];
+  const levels = ["Beginner", "Intermediate", "Advanced"] as const;
 
-  const levels = ["Beginner", "Intermediate", "Advanced"];
+  useEffect(() => {
+    fetch("/api/guest-meeting-options")
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Unable to load coaches and slots");
+        return res.json();
+      })
+      .then((payload: OptionsPayload) => {
+        setOptions(payload);
+        setData((current) => ({
+          ...current,
+          requestedPtId: current.requestedPtId || payload.pts[0]?.id || "",
+          scheduledAt: current.scheduledAt || payload.slots[0]?.scheduledAt || "",
+        }));
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Unable to load options"));
+  }, []);
 
-  const handleNext = () => setStep((s) => s + 1);
-  const handlePrev = () => setStep((s) => s - 1);
+  const progress = step < 5 ? `${(step / 4) * 100}%` : "100%";
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleNext();
+  const submitGuestMeeting = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/guest-meetings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          goal: data.goal,
+          experience: data.experience,
+          requestedPtId: data.requestedPtId,
+          scheduledAt: data.scheduledAt,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error ?? "Meeting request failed");
+      setResult(payload as SubmitResult);
+      setStep(5);
+      if ((payload as SubmitResult).emailSent) toast.success("Meeting request confirmed");
+      else toast.warning("Meeting saved. Email delivery needs SMTP setup.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Meeting request failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
+  const selectedCoachUnavailable = Boolean(
+    options?.availability
+      .find((row) => row.ptId === data.requestedPtId)
+      ?.unavailableSlots.includes(data.scheduledAt),
+  );
+  const selectedCoachUnavailableSlots = new Set(
+    options?.availability.find((row) => row.ptId === data.requestedPtId)?.unavailableSlots ?? [],
+  );
+  const calendarDays = options ? buildCalendarDays(options.slots) : [];
+  const selectedSlot = options?.slots.find((slot) => slot.scheduledAt === data.scheduledAt);
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#1b1f14,_#0f120c_55%,_#090b07_100%)] text-slate-100 flex flex-col pt-12 md:pt-24 items-center px-4 relative">
-      <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20">
-        <Button
-          asChild
-          variant="ghost"
-          className="text-slate-300 hover:text-white hover:bg-white/10"
-        >
-          <Link to="/">
-            <Home className="size-4 mr-2" />
-            Back to Home
-          </Link>
-        </Button>
+    <div className="relative min-h-[100dvh] overflow-x-hidden bg-[#080b0a] text-stone-50 dark">
+      <div className="absolute inset-y-0 left-0 hidden h-full w-[46%] opacity-85 saturate-[1.06] lg:block">
+        <OptimizedPicture
+          src="/redesign/coach-session.png"
+          alt=""
+          priority
+          sizes="(min-width: 1024px) 46vw, 100vw"
+        />
       </div>
+      <div className="absolute inset-y-0 left-0 hidden w-[58%] bg-[linear-gradient(90deg,rgba(8,11,10,0.18)_0%,rgba(8,11,10,0.66)_56%,#080b0a_100%)] lg:block" />
+      <div className="funnel-grid absolute inset-0 opacity-20" />
 
-      <div className="w-full max-w-2xl bg-black/40 backdrop-blur border border-white/10 rounded-2xl p-6 md:p-10 shadow-2xl animate-slide-up relative z-10 overflow-hidden">
-        {step < 5 && (
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-white/5">
-            <div
-              className="h-full bg-yellow-400 transition-all duration-500 ease-in-out"
-              style={{ width: `${(step / 4) * 100}%` }}
-            ></div>
-          </div>
-        )}
-
-        {step === 1 && (
-          <div className="animate-fade-in space-y-6">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold mb-2 text-slate-100">What is your primary goal?</h1>
-              <p className="text-slate-400">We'll use this to build your perfect course layout.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {goals.map((g) => {
-                const Icon = g.icon;
-                return (
-                  <button
-                    key={g.title}
-                    type="button"
-                    onClick={() => {
-                      setData({ ...data, goal: g.title });
-                      handleNext();
-                    }}
-                    className={`p-5 rounded-xl border text-left flex flex-col gap-3 transition-all ${
-                      data.goal === g.title
-                        ? "border-yellow-400 bg-yellow-400/10"
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
-                    }`}
-                  >
-                    <Icon
-                      className={`size-6 ${data.goal === g.title ? "text-yellow-400" : "text-slate-300"}`}
-                    />
-                    <div>
-                      <div className="font-semibold text-slate-100">{g.title}</div>
-                      <div className="text-xs text-slate-400 mt-1">{g.desc}</div>
-                    </div>
-                  </button>
-                );
-              })}
+      <div className="relative mx-auto flex min-h-[100dvh] max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between">
+          <Button
+            asChild
+            variant="ghost"
+            className="rounded-xl text-stone-300 hover:bg-white/[0.06] hover:text-stone-50"
+          >
+            <Link to="/">
+              <Home className="mr-2 size-4" strokeWidth={1.8} />
+              Back to home
+            </Link>
+          </Button>
+          <div className="hidden items-center gap-3 text-sm text-stone-400 sm:flex">
+            <img src="/logo.jpg" alt="Logo" className="size-8 rounded-lg object-cover" />
+            <div>
+              <div className="text-stone-200">HL Fitness intake</div>
+              <div className="text-xs text-stone-500">303 Le Thanh Nghi</div>
             </div>
           </div>
-        )}
+        </div>
 
-        {step === 2 && (
-          <div className="animate-fade-in space-y-6">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handlePrev}
-              className="absolute top-4 left-4 text-slate-400"
+        <main className="grid flex-1 items-center gap-8 py-6 lg:grid-cols-[0.72fr_1fr]">
+          <section className="hidden self-end pb-10 lg:block">
+            <div className="max-w-sm border-l border-primary/60 bg-[#080b0a]/55 p-5 backdrop-blur">
+              <div className="text-sm font-semibold text-primary">Private onboarding</div>
+              <div className="mt-2 text-2xl font-semibold tracking-tight text-stone-50">
+                Meet a coach first
+              </div>
+              <p className="mt-3 text-sm leading-6 text-stone-300">
+                Guests request a meeting. Your account is created only after a coach confirms you
+                are joining HL Fitness.
+              </p>
+            </div>
+          </section>
+
+          <section className="mx-auto w-full max-w-2xl lg:ml-auto">
+            <div className="mb-5 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                style={{ width: progress }}
+              />
+            </div>
+
+            <KineticSurface
+              variant="panel"
+              className="funnel-panel rounded-2xl bg-[#111612] p-5 sm:p-8"
             >
-              <ArrowLeft className="size-4 mr-1" /> Back
-            </Button>
-            <div className="text-center mb-8 pt-4">
-              <h1 className="text-3xl font-bold mb-2 text-slate-100">Experience Level</h1>
-              <p className="text-slate-400">How long have you been working out consistently?</p>
-            </div>
-            <div className="space-y-3">
-              {levels.map((lvl) => (
-                <button
-                  key={lvl}
-                  type="button"
-                  onClick={() => {
-                    setData({ ...data, experience: lvl });
-                    handleNext();
-                  }}
-                  className={`w-full p-4 rounded-xl border text-center font-medium transition-all ${
-                    data.experience === lvl
-                      ? "border-yellow-400 bg-yellow-400/10 text-yellow-400"
-                      : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
-                  }`}
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={step}
+                  initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -12 }}
+                  transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  {lvl}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+                  {step === 1 && (
+                    <div className="space-y-6">
+                      <Header
+                        title="What is your primary goal?"
+                        desc="We use this to match your first coach meeting to the right context."
+                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {goals.map((goal) => {
+                          const Icon = goal.icon;
+                          return (
+                            <button
+                              key={goal.title}
+                              type="button"
+                              onClick={() => {
+                                setData({ ...data, goal: goal.title });
+                                setStep(2);
+                              }}
+                              className={`rounded-xl border p-4 text-left transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                                data.goal === goal.title
+                                  ? "border-primary bg-primary/12 text-primary"
+                                  : "border-white/10 bg-white/[0.04] text-stone-200 hover:bg-white/[0.07]"
+                              }`}
+                            >
+                              <Icon className="mb-4 size-6" strokeWidth={1.8} />
+                              <div className="font-semibold text-stone-50">{goal.title}</div>
+                              <div className="mt-1 text-xs leading-5 text-stone-400">
+                                {goal.desc}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
-        {step === 3 && (
-          <div className="animate-fade-in space-y-6">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handlePrev}
-              className="absolute top-4 left-4 text-slate-400"
-            >
-              <ArrowLeft className="size-4 mr-1" /> Back
-            </Button>
-            <div className="text-center mb-8 pt-4">
-              <h1 className="text-3xl font-bold mb-2 text-slate-100">Your Details</h1>
-              <p className="text-slate-400">
-                Let us know how we can reach you to schedule your intro session.
-              </p>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-300 ml-1">Full Name</label>
-                <Input
-                  required
-                  value={data.name}
-                  onChange={(e) => setData({ ...data, name: e.target.value })}
-                  className="bg-black/50 border-white/10"
-                  placeholder="John Doe"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-300 ml-1">Email</label>
-                <Input
-                  required
-                  type="email"
-                  value={data.email}
-                  onChange={(e) => setData({ ...data, email: e.target.value })}
-                  className="bg-black/50 border-white/10"
-                  placeholder="john@example.com"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-300 ml-1">Phone Number</label>
-                <Input
-                  required
-                  type="tel"
-                  value={data.phone}
-                  onChange={(e) => setData({ ...data, phone: e.target.value })}
-                  className="bg-black/50 border-white/10"
-                  placeholder="+84 ..."
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300 h-12 text-md mt-4"
-              >
-                See Your Plan <ArrowRight className="ml-2 size-4" />
-              </Button>
-            </form>
-          </div>
-        )}
+                  {step === 2 && (
+                    <div className="space-y-6">
+                      <BackButton onClick={() => setStep(1)} />
+                      <Header
+                        title="Experience level"
+                        desc="How long have you trained consistently?"
+                      />
+                      <div className="space-y-3">
+                        {levels.map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            onClick={() => {
+                              setData({ ...data, experience: level });
+                              setStep(3);
+                            }}
+                            className={`w-full rounded-xl border p-4 text-center font-medium transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                              data.experience === level
+                                ? "border-primary bg-primary/12 text-primary"
+                                : "border-white/10 bg-white/[0.04] text-stone-200 hover:bg-white/[0.07]"
+                            }`}
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-        {step === 4 && (
-          <div className="animate-fade-in space-y-6">
-            <div className="text-center mb-6 pt-4">
-              <div className="inline-flex size-14 rounded-full bg-yellow-400/20 text-yellow-400 items-center justify-center mb-4">
-                <CheckCircle2 className="size-7" />
-              </div>
-              <h1 className="text-3xl font-bold mb-2 text-slate-100">Your Perfect Match</h1>
-              <p className="text-slate-400">
-                Based on your answers, we've designed a hybrid starting protocol.
-              </p>
-            </div>
+                  {step === 3 && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        setStep(4);
+                      }}
+                      className="space-y-6"
+                    >
+                      <BackButton onClick={() => setStep(2)} />
+                      <Header
+                        title="Your contact details"
+                        desc="We send meeting confirmation to your email. No account is created yet."
+                      />
+                      <Field label="Full Name">
+                        <Input
+                          required
+                          value={data.name}
+                          onChange={(e) => setData({ ...data, name: e.target.value })}
+                          className="h-11 rounded-lg border-white/10 bg-white/[0.06] text-stone-50 placeholder:text-stone-500"
+                          placeholder="Minh Nguyen"
+                        />
+                      </Field>
+                      <Field label="Email">
+                        <Input
+                          required
+                          type="email"
+                          value={data.email}
+                          onChange={(e) => setData({ ...data, email: e.target.value })}
+                          className="h-11 rounded-lg border-white/10 bg-white/[0.06] text-stone-50 placeholder:text-stone-500"
+                          placeholder="minh@example.com"
+                        />
+                      </Field>
+                      <Field label="Phone Number">
+                        <Input
+                          required
+                          type="tel"
+                          value={data.phone}
+                          onChange={(e) => setData({ ...data, phone: e.target.value })}
+                          className="h-11 rounded-lg border-white/10 bg-white/[0.06] text-stone-50 placeholder:text-stone-500"
+                          placeholder="+84..."
+                        />
+                      </Field>
+                      <Button
+                        type="submit"
+                        className="kinetic-cta h-12 w-full rounded-xl bg-primary text-primary-foreground transition duration-200 hover:bg-primary/90 active:scale-[0.98]"
+                      >
+                        Choose coach and time{" "}
+                        <ArrowRight className="ml-2 size-4" strokeWidth={1.8} />
+                      </Button>
+                    </form>
+                  )}
 
-            <div className="bg-white/5 border border-white/10 rounded-xl p-5 mb-6">
-              <div className="flex items-center gap-4 mb-4">
-                <img
-                  src="https://images.unsplash.com/photo-1594381898411-846e7d193883?w=100&q=80"
-                  alt="Coach"
-                  className="size-16 rounded-full object-cover border-2 border-yellow-400/50"
-                />
-                <div>
-                  <div className="font-bold text-lg text-slate-100">Coach Liam</div>
-                  <div className="text-sm text-yellow-400">
-                    Specialist in {data.goal || "Fitness"}
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-slate-300 italic px-2 border-l-2 border-yellow-400/50">
-                Hi {data.name.split(" ")[0] || "there"}! With your{" "}
-                {data.experience ? data.experience.toLowerCase() : "current"} experience level, I
-                recommend starting with our 3-day foundation plan. Let's get you in for a 1-on-1
-                testing session.
-              </p>
-            </div>
+                  {step === 4 && (
+                    <div className="space-y-6">
+                      <BackButton onClick={() => setStep(3)} />
+                      <Header
+                        title="Pick a coach and time"
+                        desc="If the selected coach is unavailable for that slot, we assign the first available coach."
+                      />
+                      {!options && (
+                        <div className="grid gap-3">
+                          {[0, 1, 2, 3].map((item) => (
+                            <div
+                              key={item}
+                              className="h-14 animate-pulse rounded-xl border border-white/10 bg-white/[0.05]"
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {options && options.pts.length === 0 && (
+                        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-stone-300">
+                          No coaches are available for guest meetings yet.
+                        </div>
+                      )}
+                      {options && options.pts.length > 0 && (
+                        <>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {options.pts.map((pt) => (
+                              <button
+                                key={pt.id}
+                                type="button"
+                                onClick={() => setData({ ...data, requestedPtId: pt.id })}
+                                className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                                  data.requestedPtId === pt.id
+                                    ? "border-primary bg-primary/12"
+                                    : "border-white/10 bg-white/[0.04] hover:bg-white/[0.07]"
+                                }`}
+                              >
+                                <div className="font-semibold text-stone-50">{pt.displayName}</div>
+                                <div className="mt-1 text-xs text-stone-400">{pt.email}</div>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="meeting-calendar overflow-hidden rounded-2xl border border-white/10 bg-[#080b0a]/48">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="grid size-10 place-items-center rounded-xl bg-primary/12 text-primary">
+                                  <CalendarDays className="size-5" strokeWidth={1.8} />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-semibold text-stone-50">
+                                    Meeting calendar
+                                  </div>
+                                  <div className="mt-0.5 text-xs text-stone-400">
+                                    {selectedSlot
+                                      ? formatSlotDateTime(
+                                          selectedSlot.scheduledAt,
+                                          selectedSlot.label,
+                                        )
+                                      : "Select a day and time"}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-stone-400">
+                                {calendarDays.length} day{calendarDays.length === 1 ? "" : "s"}
+                              </div>
+                            </div>
 
-            <div className="space-y-4 pt-4 border-t border-white/10">
-              <h3 className="font-semibold text-slate-200">Book your first Free PT Session:</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {["Tomorrow Morning", "Tomorrow Evening", "This Weekend"].map((slot) => (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => setData({ ...data, ptSession: slot })}
-                    className={`py-3 px-2 rounded-lg border text-sm font-medium transition-all ${
-                      data.ptSession === slot
-                        ? "border-yellow-400 bg-yellow-400/10 text-yellow-400"
-                        : "border-white/10 bg-black/40 text-slate-300 hover:bg-white/10"
-                    }`}
-                  >
-                    {slot}
-                  </button>
-                ))}
-              </div>
-            </div>
+                            {calendarDays.length === 0 ? (
+                              <div className="p-4 text-sm text-stone-300">
+                                No meeting slots are available yet.
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto p-3">
+                                <div className="flex min-w-[720px] gap-2">
+                                  {calendarDays.map((day) => {
+                                    const selectedDay = day.slots.some(
+                                      (slot) => slot.scheduledAt === data.scheduledAt,
+                                    );
 
-            <Button
-              type="button"
-              onClick={handleNext}
-              disabled={!data.ptSession}
-              className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300 h-12 text-md mt-4 disabled:opacity-50"
-            >
-              Confirm Booking & Create Account <ArrowRight className="ml-2 size-4" />
-            </Button>
-          </div>
-        )}
+                                    return (
+                                      <div
+                                        key={day.key}
+                                        className={`calendar-day-column flex min-w-[104px] flex-1 flex-col overflow-hidden rounded-xl border ${
+                                          selectedDay
+                                            ? "border-primary/55 bg-primary/10"
+                                            : "border-white/10 bg-white/[0.035]"
+                                        }`}
+                                      >
+                                        <div className="border-b border-white/10 p-3 text-center">
+                                          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-400">
+                                            {day.weekday}
+                                          </div>
+                                          <div className="mt-1 text-2xl font-semibold leading-none text-stone-50">
+                                            {day.dayNumber}
+                                          </div>
+                                          <div className="mt-1 text-xs text-stone-500">
+                                            {day.month}
+                                          </div>
+                                        </div>
+                                        <div className="grid gap-2 p-2">
+                                          {day.slots.map((slot) => {
+                                            const active = data.scheduledAt === slot.scheduledAt;
+                                            const unavailable = selectedCoachUnavailableSlots.has(
+                                              slot.scheduledAt,
+                                            );
 
-        {step === 5 && (
-          <div className="animate-fade-in text-center py-12 space-y-6">
-            <div className="inline-flex size-20 rounded-full bg-yellow-400 text-yellow-950 items-center justify-center mb-4 animate-glow">
-              <CheckCircle2 className="size-10" />
-            </div>
-            <h1 className="text-4xl font-bold mb-2 text-slate-100">You're All Set!</h1>
-            <p className="text-slate-400 max-w-sm mx-auto">
-              Your session for <span className="text-yellow-400">{data.ptSession}</span> is booked
-              with Coach Liam. Check your email for details.
-            </p>
-            <div className="pt-8">
-              <Button
-                asChild
-                size="lg"
-                className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
-              >
-                <Link to="/auth" search={{ mode: "signup", redirect: "/feed", email: data.email }}>
-                  Continue to App Registration
-                </Link>
-              </Button>
-            </div>
-          </div>
-        )}
+                                            return (
+                                              <button
+                                                key={slot.scheduledAt}
+                                                type="button"
+                                                onClick={() =>
+                                                  setData({
+                                                    ...data,
+                                                    scheduledAt: slot.scheduledAt,
+                                                  })
+                                                }
+                                                className={`calendar-time-chip rounded-lg border px-2 py-2 text-center transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                                                  active
+                                                    ? "border-primary bg-primary text-primary-foreground"
+                                                    : unavailable
+                                                      ? "border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
+                                                      : "border-white/10 bg-[#111612] text-stone-200 hover:bg-white/[0.07]"
+                                                }`}
+                                              >
+                                                <span className="flex items-center justify-center gap-1.5 text-sm font-semibold">
+                                                  <Clock className="size-3.5" strokeWidth={1.8} />
+                                                  {slot.timeLabel}
+                                                </span>
+                                                {unavailable && (
+                                                  <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.12em] opacity-80">
+                                                    Backup
+                                                  </span>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {selectedCoachUnavailable && (
+                            <div className="rounded-xl border border-primary/25 bg-primary/10 p-4 text-sm leading-6 text-stone-200">
+                              This coach is unavailable for that slot. Submit anyway and we will
+                              assign the first available coach.
+                            </div>
+                          )}
+                          <Button
+                            type="button"
+                            disabled={submitting || !data.requestedPtId || !data.scheduledAt}
+                            onClick={submitGuestMeeting}
+                            className="kinetic-cta h-12 w-full rounded-xl bg-primary text-primary-foreground transition duration-200 hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
+                          >
+                            {submitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+                            Request meeting
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {step === 5 && result && (
+                    <div className="py-6 text-center">
+                      <div className="mx-auto mb-5 grid size-16 place-items-center rounded-2xl bg-primary text-primary-foreground">
+                        <CheckCircle2 className="size-8" strokeWidth={1.8} />
+                      </div>
+                      <h1 className="text-3xl font-semibold tracking-tight text-stone-50">
+                        Meeting request received.
+                      </h1>
+                      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-stone-300">
+                        Your meeting is assigned to{" "}
+                        <span className="text-primary">{result.assignedPtName}</span>.{" "}
+                        {result.emailSent
+                          ? "A confirmation email has been sent to your inbox."
+                          : "Email delivery is pending SMTP setup, but the coach can see your request."}
+                      </p>
+                      {result.usedFallback && (
+                        <div className="mx-auto mt-5 max-w-md rounded-xl border border-primary/25 bg-primary/10 p-4 text-sm leading-6 text-stone-200">
+                          Your selected coach was unavailable, so we assigned the first available
+                          coach.
+                        </div>
+                      )}
+                      <Button
+                        asChild
+                        className="kinetic-cta mt-8 rounded-xl bg-primary text-primary-foreground transition duration-200 hover:bg-primary/90 active:scale-[0.98]"
+                      >
+                        <Link to="/">Back to home</Link>
+                      </Button>
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </KineticSurface>
+          </section>
+        </main>
       </div>
     </div>
   );
+}
+
+function Header({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div>
+      <h1 className="text-3xl font-semibold tracking-tight text-stone-50">{title}</h1>
+      <p className="mt-2 text-sm leading-6 text-stone-300">{desc}</p>
+    </div>
+  );
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      className="rounded-xl text-stone-400 hover:bg-white/[0.06] hover:text-stone-100"
+    >
+      <ArrowLeft className="mr-2 size-4" strokeWidth={1.8} />
+      Back
+    </Button>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block space-y-2">
+      <span className="text-sm font-medium text-stone-200">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function buildCalendarDays(slots: SlotOption[]): CalendarDay[] {
+  const days = new Map<string, CalendarDay>();
+
+  slots.forEach((slot) => {
+    const date = new Date(slot.scheduledAt);
+    const key = isValidDate(date) ? formatLocalDateKey(date) : slot.label.split(",")[0];
+    const day = days.get(key) ?? {
+      key,
+      weekday: isValidDate(date)
+        ? new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date)
+        : key,
+      dayNumber: isValidDate(date)
+        ? new Intl.DateTimeFormat("en-US", { day: "2-digit" }).format(date)
+        : "",
+      month: isValidDate(date)
+        ? new Intl.DateTimeFormat("en-US", { month: "short" }).format(date)
+        : "",
+      fullLabel: isValidDate(date)
+        ? new Intl.DateTimeFormat("en-US", {
+            weekday: "short",
+            day: "2-digit",
+            month: "short",
+          }).format(date)
+        : key,
+      slots: [],
+    };
+
+    day.slots.push({ ...slot, timeLabel: formatSlotTime(slot) });
+    days.set(key, day);
+  });
+
+  return Array.from(days.values());
+}
+
+function formatSlotDateTime(scheduledAt: string, fallback: string) {
+  const date = new Date(scheduledAt);
+  if (!isValidDate(date)) return fallback;
+
+  const day = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  }).format(date);
+
+  return `${day}, ${formatSlotTime({ scheduledAt, label: fallback })}`;
+}
+
+function formatSlotTime(slot: SlotOption) {
+  const date = new Date(slot.scheduledAt);
+  if (isValidDate(date)) {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
+  }
+
+  return slot.label.split(",").at(-1)?.trim() || slot.label;
+}
+
+function formatLocalDateKey(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function isValidDate(date: Date) {
+  return !Number.isNaN(date.getTime());
 }

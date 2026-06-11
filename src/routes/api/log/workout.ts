@@ -13,7 +13,7 @@ export const Route = createFileRoute("/api/log/workout")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
         const url = new URL(request.url);
         const fromDate = url.searchParams.get("fromDate");
@@ -22,13 +22,12 @@ export const Route = createFileRoute("/api/log/workout")({
         const where = [eq(schema.workoutLogs.userId, session.userId)];
         if (fromDate) where.push(gte(schema.workoutLogs.performedAt, fromDate));
         if (toDate) where.push(lte(schema.workoutLogs.performedAt, toDate));
-        const rows = db
+        const rows = await db
           .select()
           .from(schema.workoutLogs)
           .where(and(...where))
           .orderBy(desc(schema.workoutLogs.performedAt), desc(schema.workoutLogs.createdAt))
-          .limit(limit)
-          .all();
+          .limit(limit);
         return new Response(JSON.stringify(rows), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -38,7 +37,7 @@ export const Route = createFileRoute("/api/log/workout")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -70,7 +69,8 @@ export const Route = createFileRoute("/api/log/workout")({
           bodyObj["date"] ??
           new Date().toISOString().slice(0, 10)) as string;
         try {
-          db.insert(schema.workoutLogs)
+          await db
+            .insert(schema.workoutLogs)
             .values({
               id,
               userId: session.userId,
@@ -83,8 +83,7 @@ export const Route = createFileRoute("/api/log/workout")({
               dayLabel: typeof bodyObj?.dayLabel === "string" ? (bodyObj.dayLabel as string) : null,
               muscleGroup:
                 typeof bodyObj?.muscleGroup === "string" ? (bodyObj.muscleGroup as string) : null,
-            })
-            .run();
+            });
           return new Response(JSON.stringify({ ok: true, id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

@@ -17,6 +17,7 @@ const createSchema = z.object({
 const updateSchema = z.object({
   id: z.string().min(1),
   status: z.enum(["open", "assigned", "resolved", "closed"]).optional(),
+  assignedManagerId: z.string().nullable().optional(),
   assignedStaffId: z.string().nullable().optional(),
   assignedPtId: z.string().nullable().optional(),
   resolutionNotes: z.string().max(1000).nullable().optional(),
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/api/support")({
   server: {
     handlers: {
       GET: async () => {
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) {
           return json({ error: "Unauthorized" }, 401);
         }
@@ -50,7 +51,7 @@ export const Route = createFileRoute("/api/support")({
                 message: schema.supportTickets.message,
                 source: schema.supportTickets.source,
                 status: schema.supportTickets.status,
-                assignedStaffId: schema.supportTickets.assignedStaffId,
+                assignedManagerId: schema.supportTickets.assignedManagerId,
                 assignedPtId: schema.supportTickets.assignedPtId,
                 resolutionNotes: schema.supportTickets.resolutionNotes,
                 resolvedAt: schema.supportTickets.resolvedAt,
@@ -61,12 +62,11 @@ export const Route = createFileRoute("/api/support")({
               .innerJoin(schema.users, eq(schema.supportTickets.customerId, schema.users.id));
 
           const tickets = where.length
-            ? selectTickets()
+            ? await selectTickets()
                 .where(and(...where))
                 .orderBy(desc(schema.supportTickets.updatedAt))
                 .limit(200)
-                .all()
-            : selectTickets().orderBy(desc(schema.supportTickets.updatedAt)).limit(200).all();
+            : await selectTickets().orderBy(desc(schema.supportTickets.updatedAt)).limit(200);
           return json({ tickets });
         } catch (err) {
           await logDevError({ error: err, req: { method: "GET", url: "/api/support" } }).catch(
@@ -79,7 +79,7 @@ export const Route = createFileRoute("/api/support")({
       POST: async (ctx: unknown) => {
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) return json({ error: "Unauthorized" }, 401);
 
         const parsed = createSchema.safeParse(await parseRequestBody(request as unknown));
@@ -88,10 +88,10 @@ export const Route = createFileRoute("/api/support")({
         let customerId = session.userId;
         if (session.role === "customer") {
           customerId = session.userId;
-        } else if (hasAnyRole(session, ["admin", "staff"]) && parsed.data.customerId) {
+        } else if (hasAnyRole(session, ["admin", "manager"]) && parsed.data.customerId) {
           customerId = parsed.data.customerId;
         } else if (session.role === "pt" && parsed.data.customerId) {
-          const assignedCustomer = db
+          const [assignedCustomer] = await db
             .select({ id: schema.users.id })
             .from(schema.users)
             .where(
@@ -100,7 +100,7 @@ export const Route = createFileRoute("/api/support")({
                 eq(schema.users.assignedPtId, session.userId),
               ),
             )
-            .get();
+            .limit(1);
           if (!assignedCustomer)
             return json({ error: "PT can only create for assigned clients" }, 403);
           customerId = parsed.data.customerId;
@@ -108,25 +108,25 @@ export const Route = createFileRoute("/api/support")({
           return json({ error: "customerId required" }, 400);
         }
 
-        const customer = db
+        const [customer] = await db
           .select({ id: schema.users.id, role: schema.users.role })
           .from(schema.users)
           .where(eq(schema.users.id, customerId))
-          .get();
+          .limit(1);
         if (!customer || customer.role !== "customer")
           return json({ error: "Customer not found" }, 400);
 
         try {
           const id = newId();
-          db.insert(schema.supportTickets)
+          await db
+            .insert(schema.supportTickets)
             .values({
               id,
               customerId,
               subject: parsed.data.subject,
               message: parsed.data.message,
               source: parsed.data.source,
-            })
-            .run();
+            });
           return json({ ok: true, id }, 201);
         } catch (err) {
           await logDevError({
@@ -140,18 +140,18 @@ export const Route = createFileRoute("/api/support")({
       PATCH: async (ctx: unknown) => {
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) return json({ error: "Unauthorized" }, 401);
 
         const parsed = updateSchema.safeParse(await parseRequestBody(request as unknown));
         if (!parsed.success) return json({ error: "Invalid input", details: parsed.error }, 400);
         const data = parsed.data;
 
-        const ticket = db
+        const [ticket] = await db
           .select()
           .from(schema.supportTickets)
           .where(eq(schema.supportTickets.id, data.id))
-          .get();
+          .limit(1);
         if (!ticket) return json({ error: "Ticket not found" }, 404);
 
         const action =
@@ -160,26 +160,30 @@ export const Route = createFileRoute("/api/support")({
           return json({ error: "Forbidden" }, 403);
 
         const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-        if (Object.prototype.hasOwnProperty.call(data, "assignedStaffId")) {
-          if (data.assignedStaffId) {
-            const staff = db
+        const assignedManagerId = data.assignedManagerId ?? data.assignedStaffId;
+        if (
+          Object.prototype.hasOwnProperty.call(data, "assignedManagerId") ||
+          Object.prototype.hasOwnProperty.call(data, "assignedStaffId")
+        ) {
+          if (assignedManagerId) {
+            const [manager] = await db
               .select({ id: schema.users.id, role: schema.users.role })
               .from(schema.users)
-              .where(eq(schema.users.id, data.assignedStaffId))
-              .get();
-            if (!staff || !["staff", "admin"].includes(staff.role)) {
-              return json({ error: "Assigned staff not found" }, 400);
+              .where(eq(schema.users.id, assignedManagerId))
+              .limit(1);
+            if (!manager || !["manager", "admin"].includes(manager.role)) {
+              return json({ error: "Assigned manager not found" }, 400);
             }
           }
-          patch.assignedStaffId = data.assignedStaffId ?? null;
+          patch.assignedManagerId = assignedManagerId ?? null;
         }
         if (Object.prototype.hasOwnProperty.call(data, "assignedPtId")) {
           if (data.assignedPtId) {
-            const pt = db
+            const [pt] = await db
               .select({ id: schema.users.id, role: schema.users.role })
               .from(schema.users)
               .where(eq(schema.users.id, data.assignedPtId))
-              .get();
+              .limit(1);
             if (!pt || pt.role !== "pt") return json({ error: "Assigned PT not found" }, 400);
           }
           patch.assignedPtId = data.assignedPtId ?? null;
@@ -195,10 +199,10 @@ export const Route = createFileRoute("/api/support")({
         }
 
         try {
-          db.update(schema.supportTickets)
+          await db
+            .update(schema.supportTickets)
             .set(patch)
-            .where(eq(schema.supportTickets.id, data.id))
-            .run();
+            .where(eq(schema.supportTickets.id, data.id));
           return json({ ok: true });
         } catch (err) {
           await logDevError({

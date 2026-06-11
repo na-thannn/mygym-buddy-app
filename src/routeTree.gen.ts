@@ -19,12 +19,16 @@ import { Route as ApiSignupRouteImport } from './routes/api/signup'
 import { Route as ApiSignoutRouteImport } from './routes/api/signout'
 import { Route as ApiSigninRouteImport } from './routes/api/signin'
 import { Route as ApiPtsRouteImport } from './routes/api/pts'
+import { Route as ApiPtUnavailableDaysRouteImport } from './routes/api/pt-unavailable-days'
 import { Route as ApiProgressReportRouteImport } from './routes/api/progress-report'
 import { Route as ApiProgressPhotosRouteImport } from './routes/api/progress-photos'
 import { Route as ApiProfileRouteImport } from './routes/api/profile'
 import { Route as ApiPlansRouteImport } from './routes/api/plans'
 import { Route as ApiPlanFeedbackRouteImport } from './routes/api/plan-feedback'
+import { Route as ApiPasswordRouteImport } from './routes/api/password'
 import { Route as ApiInbodyRouteImport } from './routes/api/inbody'
+import { Route as ApiGuestMeetingsRouteImport } from './routes/api/guest-meetings'
+import { Route as ApiGuestMeetingOptionsRouteImport } from './routes/api/guest-meeting-options'
 import { Route as ApiFeedRouteImport } from './routes/api/feed'
 import { Route as ApiDebugEchoRouteImport } from './routes/api/debug-echo'
 import { Route as ApiCustomersRouteImport } from './routes/api/customers'
@@ -40,15 +44,34 @@ import { Route as AuthenticatedProgressReportRouteImport } from './routes/_authe
 import { Route as AuthenticatedProgressRouteImport } from './routes/_authenticated/progress'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPlansRouteImport } from './routes/_authenticated/plans'
+import { Route as AuthenticatedPackagesRouteImport } from './routes/_authenticated/packages'
 import { Route as AuthenticatedNutritionRouteImport } from './routes/_authenticated/nutrition'
 import { Route as AuthenticatedInbodyRouteImport } from './routes/_authenticated/inbody'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedClassesRouteImport } from './routes/_authenticated/classes'
+import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated/change-password'
 import { Route as AuthenticatedBookingsRouteImport } from './routes/_authenticated/bookings'
 import { Route as AuthenticatedAnalysesRouteImport } from './routes/_authenticated/analyses'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiPublicPtsRouteImport } from './routes/api/public/pts'
+import { Route as ApiPublicPackagesRouteImport } from './routes/api/public/packages'
+import { Route as ApiPublicLandingRouteImport } from './routes/api/public/landing'
+import { Route as ApiPublicEventsRouteImport } from './routes/api/public/events'
+import { Route as ApiPtServicesRouteImport } from './routes/api/pt/services'
+import { Route as ApiPtUnavailableDaysImportPreviewRouteImport } from './routes/api/pt-unavailable-days/import-preview'
+import { Route as ApiManagerServicesRouteImport } from './routes/api/manager/services'
+import { Route as ApiManagerPurchaseRequestsRouteImport } from './routes/api/manager/purchase-requests'
+import { Route as ApiManagerPromotionsRouteImport } from './routes/api/manager/promotions'
+import { Route as ApiManagerPaymentsRouteImport } from './routes/api/manager/payments'
+import { Route as ApiManagerPackagesRouteImport } from './routes/api/manager/packages'
+import { Route as ApiManagerMembershipsRouteImport } from './routes/api/manager/memberships'
+import { Route as ApiManagerEventsRouteImport } from './routes/api/manager/events'
 import { Route as ApiLogWorkoutRouteImport } from './routes/api/log/workout'
 import { Route as ApiLogNutritionReportRouteImport } from './routes/api/log/nutrition-report'
+import { Route as ApiCustomerPackageRequestsRouteImport } from './routes/api/customer/package-requests'
+import { Route as ApiCustomerMembershipsRouteImport } from './routes/api/customer/memberships'
+import { Route as ApiChatThreadsRouteImport } from './routes/api/chat/threads'
+import { Route as ApiChatThreadRouteImport } from './routes/api/chat/thread'
 import { Route as ApiAdminUsersRouteImport } from './routes/api/admin/users'
 import { Route as ApiAdminStatsRouteImport } from './routes/api/admin/stats'
 import { Route as AuthenticatedLogWorkoutRouteImport } from './routes/_authenticated/log.workout'
@@ -103,6 +126,11 @@ const ApiPtsRoute = ApiPtsRouteImport.update({
   path: '/api/pts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPtUnavailableDaysRoute = ApiPtUnavailableDaysRouteImport.update({
+  id: '/api/pt-unavailable-days',
+  path: '/api/pt-unavailable-days',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProgressReportRoute = ApiProgressReportRouteImport.update({
   id: '/api/progress-report',
   path: '/api/progress-report',
@@ -128,9 +156,24 @@ const ApiPlanFeedbackRoute = ApiPlanFeedbackRouteImport.update({
   path: '/api/plan-feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPasswordRoute = ApiPasswordRouteImport.update({
+  id: '/api/password',
+  path: '/api/password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiInbodyRoute = ApiInbodyRouteImport.update({
   id: '/api/inbody',
   path: '/api/inbody',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGuestMeetingsRoute = ApiGuestMeetingsRouteImport.update({
+  id: '/api/guest-meetings',
+  path: '/api/guest-meetings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGuestMeetingOptionsRoute = ApiGuestMeetingOptionsRouteImport.update({
+  id: '/api/guest-meeting-options',
+  path: '/api/guest-meeting-options',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFeedRoute = ApiFeedRouteImport.update({
@@ -209,6 +252,11 @@ const AuthenticatedPlansRoute = AuthenticatedPlansRouteImport.update({
   path: '/plans',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPackagesRoute = AuthenticatedPackagesRouteImport.update({
+  id: '/packages',
+  path: '/packages',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedNutritionRoute = AuthenticatedNutritionRouteImport.update({
   id: '/nutrition',
   path: '/nutrition',
@@ -229,6 +277,12 @@ const AuthenticatedClassesRoute = AuthenticatedClassesRouteImport.update({
   path: '/classes',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedChangePasswordRoute =
+  AuthenticatedChangePasswordRouteImport.update({
+    id: '/change-password',
+    path: '/change-password',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedBookingsRoute = AuthenticatedBookingsRouteImport.update({
   id: '/bookings',
   path: '/bookings',
@@ -244,6 +298,73 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiPublicPtsRoute = ApiPublicPtsRouteImport.update({
+  id: '/api/public/pts',
+  path: '/api/public/pts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPackagesRoute = ApiPublicPackagesRouteImport.update({
+  id: '/api/public/packages',
+  path: '/api/public/packages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicLandingRoute = ApiPublicLandingRouteImport.update({
+  id: '/api/public/landing',
+  path: '/api/public/landing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicEventsRoute = ApiPublicEventsRouteImport.update({
+  id: '/api/public/events',
+  path: '/api/public/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPtServicesRoute = ApiPtServicesRouteImport.update({
+  id: '/api/pt/services',
+  path: '/api/pt/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPtUnavailableDaysImportPreviewRoute =
+  ApiPtUnavailableDaysImportPreviewRouteImport.update({
+    id: '/import-preview',
+    path: '/import-preview',
+    getParentRoute: () => ApiPtUnavailableDaysRoute,
+  } as any)
+const ApiManagerServicesRoute = ApiManagerServicesRouteImport.update({
+  id: '/api/manager/services',
+  path: '/api/manager/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiManagerPurchaseRequestsRoute =
+  ApiManagerPurchaseRequestsRouteImport.update({
+    id: '/api/manager/purchase-requests',
+    path: '/api/manager/purchase-requests',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiManagerPromotionsRoute = ApiManagerPromotionsRouteImport.update({
+  id: '/api/manager/promotions',
+  path: '/api/manager/promotions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiManagerPaymentsRoute = ApiManagerPaymentsRouteImport.update({
+  id: '/api/manager/payments',
+  path: '/api/manager/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiManagerPackagesRoute = ApiManagerPackagesRouteImport.update({
+  id: '/api/manager/packages',
+  path: '/api/manager/packages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiManagerMembershipsRoute = ApiManagerMembershipsRouteImport.update({
+  id: '/api/manager/memberships',
+  path: '/api/manager/memberships',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiManagerEventsRoute = ApiManagerEventsRouteImport.update({
+  id: '/api/manager/events',
+  path: '/api/manager/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLogWorkoutRoute = ApiLogWorkoutRouteImport.update({
   id: '/api/log/workout',
   path: '/api/log/workout',
@@ -253,6 +374,27 @@ const ApiLogNutritionReportRoute = ApiLogNutritionReportRouteImport.update({
   id: '/api/log/nutrition-report',
   path: '/api/log/nutrition-report',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCustomerPackageRequestsRoute =
+  ApiCustomerPackageRequestsRouteImport.update({
+    id: '/api/customer/package-requests',
+    path: '/api/customer/package-requests',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiCustomerMembershipsRoute = ApiCustomerMembershipsRouteImport.update({
+  id: '/api/customer/memberships',
+  path: '/api/customer/memberships',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatThreadsRoute = ApiChatThreadsRouteImport.update({
+  id: '/threads',
+  path: '/threads',
+  getParentRoute: () => ApiChatRoute,
+} as any)
+const ApiChatThreadRoute = ApiChatThreadRouteImport.update({
+  id: '/thread',
+  path: '/thread',
+  getParentRoute: () => ApiChatRoute,
 } as any)
 const ApiAdminUsersRoute = ApiAdminUsersRouteImport.update({
   id: '/api/admin/users',
@@ -283,10 +425,12 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/analyses': typeof AuthenticatedAnalysesRoute
   '/bookings': typeof AuthenticatedBookingsRoute
+  '/change-password': typeof AuthenticatedChangePasswordRoute
   '/classes': typeof AuthenticatedClassesRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/inbody': typeof AuthenticatedInbodyRoute
   '/nutrition': typeof AuthenticatedNutritionRoute
+  '/packages': typeof AuthenticatedPackagesRoute
   '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress': typeof AuthenticatedProgressRoute
@@ -296,18 +440,22 @@ export interface FileRoutesByFullPath {
   '/trainer': typeof AuthenticatedTrainerRoute
   '/api/analyses': typeof ApiAnalysesRoute
   '/api/bookings': typeof ApiBookingsRoute
-  '/api/chat': typeof ApiChatRoute
+  '/api/chat': typeof ApiChatRouteWithChildren
   '/api/classes': typeof ApiClassesRoute
   '/api/current-user': typeof ApiCurrentUserRoute
   '/api/customers': typeof ApiCustomersRoute
   '/api/debug-echo': typeof ApiDebugEchoRoute
   '/api/feed': typeof ApiFeedRoute
+  '/api/guest-meeting-options': typeof ApiGuestMeetingOptionsRoute
+  '/api/guest-meetings': typeof ApiGuestMeetingsRoute
   '/api/inbody': typeof ApiInbodyRoute
+  '/api/password': typeof ApiPasswordRoute
   '/api/plan-feedback': typeof ApiPlanFeedbackRoute
   '/api/plans': typeof ApiPlansRoute
   '/api/profile': typeof ApiProfileRoute
   '/api/progress-photos': typeof ApiProgressPhotosRoute
   '/api/progress-report': typeof ApiProgressReportRoute
+  '/api/pt-unavailable-days': typeof ApiPtUnavailableDaysRouteWithChildren
   '/api/pts': typeof ApiPtsRoute
   '/api/signin': typeof ApiSigninRoute
   '/api/signout': typeof ApiSignoutRoute
@@ -318,8 +466,25 @@ export interface FileRoutesByFullPath {
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
   '/api/admin/stats': typeof ApiAdminStatsRoute
   '/api/admin/users': typeof ApiAdminUsersRoute
+  '/api/chat/thread': typeof ApiChatThreadRoute
+  '/api/chat/threads': typeof ApiChatThreadsRoute
+  '/api/customer/memberships': typeof ApiCustomerMembershipsRoute
+  '/api/customer/package-requests': typeof ApiCustomerPackageRequestsRoute
   '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
   '/api/log/workout': typeof ApiLogWorkoutRoute
+  '/api/manager/events': typeof ApiManagerEventsRoute
+  '/api/manager/memberships': typeof ApiManagerMembershipsRoute
+  '/api/manager/packages': typeof ApiManagerPackagesRoute
+  '/api/manager/payments': typeof ApiManagerPaymentsRoute
+  '/api/manager/promotions': typeof ApiManagerPromotionsRoute
+  '/api/manager/purchase-requests': typeof ApiManagerPurchaseRequestsRoute
+  '/api/manager/services': typeof ApiManagerServicesRoute
+  '/api/pt-unavailable-days/import-preview': typeof ApiPtUnavailableDaysImportPreviewRoute
+  '/api/pt/services': typeof ApiPtServicesRoute
+  '/api/public/events': typeof ApiPublicEventsRoute
+  '/api/public/landing': typeof ApiPublicLandingRoute
+  '/api/public/packages': typeof ApiPublicPackagesRoute
+  '/api/public/pts': typeof ApiPublicPtsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -328,10 +493,12 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/analyses': typeof AuthenticatedAnalysesRoute
   '/bookings': typeof AuthenticatedBookingsRoute
+  '/change-password': typeof AuthenticatedChangePasswordRoute
   '/classes': typeof AuthenticatedClassesRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/inbody': typeof AuthenticatedInbodyRoute
   '/nutrition': typeof AuthenticatedNutritionRoute
+  '/packages': typeof AuthenticatedPackagesRoute
   '/plans': typeof AuthenticatedPlansRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/progress': typeof AuthenticatedProgressRoute
@@ -341,18 +508,22 @@ export interface FileRoutesByTo {
   '/trainer': typeof AuthenticatedTrainerRoute
   '/api/analyses': typeof ApiAnalysesRoute
   '/api/bookings': typeof ApiBookingsRoute
-  '/api/chat': typeof ApiChatRoute
+  '/api/chat': typeof ApiChatRouteWithChildren
   '/api/classes': typeof ApiClassesRoute
   '/api/current-user': typeof ApiCurrentUserRoute
   '/api/customers': typeof ApiCustomersRoute
   '/api/debug-echo': typeof ApiDebugEchoRoute
   '/api/feed': typeof ApiFeedRoute
+  '/api/guest-meeting-options': typeof ApiGuestMeetingOptionsRoute
+  '/api/guest-meetings': typeof ApiGuestMeetingsRoute
   '/api/inbody': typeof ApiInbodyRoute
+  '/api/password': typeof ApiPasswordRoute
   '/api/plan-feedback': typeof ApiPlanFeedbackRoute
   '/api/plans': typeof ApiPlansRoute
   '/api/profile': typeof ApiProfileRoute
   '/api/progress-photos': typeof ApiProgressPhotosRoute
   '/api/progress-report': typeof ApiProgressReportRoute
+  '/api/pt-unavailable-days': typeof ApiPtUnavailableDaysRouteWithChildren
   '/api/pts': typeof ApiPtsRoute
   '/api/signin': typeof ApiSigninRoute
   '/api/signout': typeof ApiSignoutRoute
@@ -363,8 +534,25 @@ export interface FileRoutesByTo {
   '/log/workout': typeof AuthenticatedLogWorkoutRoute
   '/api/admin/stats': typeof ApiAdminStatsRoute
   '/api/admin/users': typeof ApiAdminUsersRoute
+  '/api/chat/thread': typeof ApiChatThreadRoute
+  '/api/chat/threads': typeof ApiChatThreadsRoute
+  '/api/customer/memberships': typeof ApiCustomerMembershipsRoute
+  '/api/customer/package-requests': typeof ApiCustomerPackageRequestsRoute
   '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
   '/api/log/workout': typeof ApiLogWorkoutRoute
+  '/api/manager/events': typeof ApiManagerEventsRoute
+  '/api/manager/memberships': typeof ApiManagerMembershipsRoute
+  '/api/manager/packages': typeof ApiManagerPackagesRoute
+  '/api/manager/payments': typeof ApiManagerPaymentsRoute
+  '/api/manager/promotions': typeof ApiManagerPromotionsRoute
+  '/api/manager/purchase-requests': typeof ApiManagerPurchaseRequestsRoute
+  '/api/manager/services': typeof ApiManagerServicesRoute
+  '/api/pt-unavailable-days/import-preview': typeof ApiPtUnavailableDaysImportPreviewRoute
+  '/api/pt/services': typeof ApiPtServicesRoute
+  '/api/public/events': typeof ApiPublicEventsRoute
+  '/api/public/landing': typeof ApiPublicLandingRoute
+  '/api/public/packages': typeof ApiPublicPackagesRoute
+  '/api/public/pts': typeof ApiPublicPtsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -375,10 +563,12 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analyses': typeof AuthenticatedAnalysesRoute
   '/_authenticated/bookings': typeof AuthenticatedBookingsRoute
+  '/_authenticated/change-password': typeof AuthenticatedChangePasswordRoute
   '/_authenticated/classes': typeof AuthenticatedClassesRoute
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/inbody': typeof AuthenticatedInbodyRoute
   '/_authenticated/nutrition': typeof AuthenticatedNutritionRoute
+  '/_authenticated/packages': typeof AuthenticatedPackagesRoute
   '/_authenticated/plans': typeof AuthenticatedPlansRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/progress': typeof AuthenticatedProgressRoute
@@ -388,18 +578,22 @@ export interface FileRoutesById {
   '/_authenticated/trainer': typeof AuthenticatedTrainerRoute
   '/api/analyses': typeof ApiAnalysesRoute
   '/api/bookings': typeof ApiBookingsRoute
-  '/api/chat': typeof ApiChatRoute
+  '/api/chat': typeof ApiChatRouteWithChildren
   '/api/classes': typeof ApiClassesRoute
   '/api/current-user': typeof ApiCurrentUserRoute
   '/api/customers': typeof ApiCustomersRoute
   '/api/debug-echo': typeof ApiDebugEchoRoute
   '/api/feed': typeof ApiFeedRoute
+  '/api/guest-meeting-options': typeof ApiGuestMeetingOptionsRoute
+  '/api/guest-meetings': typeof ApiGuestMeetingsRoute
   '/api/inbody': typeof ApiInbodyRoute
+  '/api/password': typeof ApiPasswordRoute
   '/api/plan-feedback': typeof ApiPlanFeedbackRoute
   '/api/plans': typeof ApiPlansRoute
   '/api/profile': typeof ApiProfileRoute
   '/api/progress-photos': typeof ApiProgressPhotosRoute
   '/api/progress-report': typeof ApiProgressReportRoute
+  '/api/pt-unavailable-days': typeof ApiPtUnavailableDaysRouteWithChildren
   '/api/pts': typeof ApiPtsRoute
   '/api/signin': typeof ApiSigninRoute
   '/api/signout': typeof ApiSignoutRoute
@@ -410,8 +604,25 @@ export interface FileRoutesById {
   '/_authenticated/log/workout': typeof AuthenticatedLogWorkoutRoute
   '/api/admin/stats': typeof ApiAdminStatsRoute
   '/api/admin/users': typeof ApiAdminUsersRoute
+  '/api/chat/thread': typeof ApiChatThreadRoute
+  '/api/chat/threads': typeof ApiChatThreadsRoute
+  '/api/customer/memberships': typeof ApiCustomerMembershipsRoute
+  '/api/customer/package-requests': typeof ApiCustomerPackageRequestsRoute
   '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
   '/api/log/workout': typeof ApiLogWorkoutRoute
+  '/api/manager/events': typeof ApiManagerEventsRoute
+  '/api/manager/memberships': typeof ApiManagerMembershipsRoute
+  '/api/manager/packages': typeof ApiManagerPackagesRoute
+  '/api/manager/payments': typeof ApiManagerPaymentsRoute
+  '/api/manager/promotions': typeof ApiManagerPromotionsRoute
+  '/api/manager/purchase-requests': typeof ApiManagerPurchaseRequestsRoute
+  '/api/manager/services': typeof ApiManagerServicesRoute
+  '/api/pt-unavailable-days/import-preview': typeof ApiPtUnavailableDaysImportPreviewRoute
+  '/api/pt/services': typeof ApiPtServicesRoute
+  '/api/public/events': typeof ApiPublicEventsRoute
+  '/api/public/landing': typeof ApiPublicLandingRoute
+  '/api/public/packages': typeof ApiPublicPackagesRoute
+  '/api/public/pts': typeof ApiPublicPtsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -422,10 +633,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analyses'
     | '/bookings'
+    | '/change-password'
     | '/classes'
     | '/feed'
     | '/inbody'
     | '/nutrition'
+    | '/packages'
     | '/plans'
     | '/profile'
     | '/progress'
@@ -441,12 +654,16 @@ export interface FileRouteTypes {
     | '/api/customers'
     | '/api/debug-echo'
     | '/api/feed'
+    | '/api/guest-meeting-options'
+    | '/api/guest-meetings'
     | '/api/inbody'
+    | '/api/password'
     | '/api/plan-feedback'
     | '/api/plans'
     | '/api/profile'
     | '/api/progress-photos'
     | '/api/progress-report'
+    | '/api/pt-unavailable-days'
     | '/api/pts'
     | '/api/signin'
     | '/api/signout'
@@ -457,8 +674,25 @@ export interface FileRouteTypes {
     | '/log/workout'
     | '/api/admin/stats'
     | '/api/admin/users'
+    | '/api/chat/thread'
+    | '/api/chat/threads'
+    | '/api/customer/memberships'
+    | '/api/customer/package-requests'
     | '/api/log/nutrition-report'
     | '/api/log/workout'
+    | '/api/manager/events'
+    | '/api/manager/memberships'
+    | '/api/manager/packages'
+    | '/api/manager/payments'
+    | '/api/manager/promotions'
+    | '/api/manager/purchase-requests'
+    | '/api/manager/services'
+    | '/api/pt-unavailable-days/import-preview'
+    | '/api/pt/services'
+    | '/api/public/events'
+    | '/api/public/landing'
+    | '/api/public/packages'
+    | '/api/public/pts'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -467,10 +701,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analyses'
     | '/bookings'
+    | '/change-password'
     | '/classes'
     | '/feed'
     | '/inbody'
     | '/nutrition'
+    | '/packages'
     | '/plans'
     | '/profile'
     | '/progress'
@@ -486,12 +722,16 @@ export interface FileRouteTypes {
     | '/api/customers'
     | '/api/debug-echo'
     | '/api/feed'
+    | '/api/guest-meeting-options'
+    | '/api/guest-meetings'
     | '/api/inbody'
+    | '/api/password'
     | '/api/plan-feedback'
     | '/api/plans'
     | '/api/profile'
     | '/api/progress-photos'
     | '/api/progress-report'
+    | '/api/pt-unavailable-days'
     | '/api/pts'
     | '/api/signin'
     | '/api/signout'
@@ -502,8 +742,25 @@ export interface FileRouteTypes {
     | '/log/workout'
     | '/api/admin/stats'
     | '/api/admin/users'
+    | '/api/chat/thread'
+    | '/api/chat/threads'
+    | '/api/customer/memberships'
+    | '/api/customer/package-requests'
     | '/api/log/nutrition-report'
     | '/api/log/workout'
+    | '/api/manager/events'
+    | '/api/manager/memberships'
+    | '/api/manager/packages'
+    | '/api/manager/payments'
+    | '/api/manager/promotions'
+    | '/api/manager/purchase-requests'
+    | '/api/manager/services'
+    | '/api/pt-unavailable-days/import-preview'
+    | '/api/pt/services'
+    | '/api/public/events'
+    | '/api/public/landing'
+    | '/api/public/packages'
+    | '/api/public/pts'
   id:
     | '__root__'
     | '/'
@@ -513,10 +770,12 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/analyses'
     | '/_authenticated/bookings'
+    | '/_authenticated/change-password'
     | '/_authenticated/classes'
     | '/_authenticated/feed'
     | '/_authenticated/inbody'
     | '/_authenticated/nutrition'
+    | '/_authenticated/packages'
     | '/_authenticated/plans'
     | '/_authenticated/profile'
     | '/_authenticated/progress'
@@ -532,12 +791,16 @@ export interface FileRouteTypes {
     | '/api/customers'
     | '/api/debug-echo'
     | '/api/feed'
+    | '/api/guest-meeting-options'
+    | '/api/guest-meetings'
     | '/api/inbody'
+    | '/api/password'
     | '/api/plan-feedback'
     | '/api/plans'
     | '/api/profile'
     | '/api/progress-photos'
     | '/api/progress-report'
+    | '/api/pt-unavailable-days'
     | '/api/pts'
     | '/api/signin'
     | '/api/signout'
@@ -548,8 +811,25 @@ export interface FileRouteTypes {
     | '/_authenticated/log/workout'
     | '/api/admin/stats'
     | '/api/admin/users'
+    | '/api/chat/thread'
+    | '/api/chat/threads'
+    | '/api/customer/memberships'
+    | '/api/customer/package-requests'
     | '/api/log/nutrition-report'
     | '/api/log/workout'
+    | '/api/manager/events'
+    | '/api/manager/memberships'
+    | '/api/manager/packages'
+    | '/api/manager/payments'
+    | '/api/manager/promotions'
+    | '/api/manager/purchase-requests'
+    | '/api/manager/services'
+    | '/api/pt-unavailable-days/import-preview'
+    | '/api/pt/services'
+    | '/api/public/events'
+    | '/api/public/landing'
+    | '/api/public/packages'
+    | '/api/public/pts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -559,18 +839,22 @@ export interface RootRouteChildren {
   GetStartedRoute: typeof GetStartedRoute
   ApiAnalysesRoute: typeof ApiAnalysesRoute
   ApiBookingsRoute: typeof ApiBookingsRoute
-  ApiChatRoute: typeof ApiChatRoute
+  ApiChatRoute: typeof ApiChatRouteWithChildren
   ApiClassesRoute: typeof ApiClassesRoute
   ApiCurrentUserRoute: typeof ApiCurrentUserRoute
   ApiCustomersRoute: typeof ApiCustomersRoute
   ApiDebugEchoRoute: typeof ApiDebugEchoRoute
   ApiFeedRoute: typeof ApiFeedRoute
+  ApiGuestMeetingOptionsRoute: typeof ApiGuestMeetingOptionsRoute
+  ApiGuestMeetingsRoute: typeof ApiGuestMeetingsRoute
   ApiInbodyRoute: typeof ApiInbodyRoute
+  ApiPasswordRoute: typeof ApiPasswordRoute
   ApiPlanFeedbackRoute: typeof ApiPlanFeedbackRoute
   ApiPlansRoute: typeof ApiPlansRoute
   ApiProfileRoute: typeof ApiProfileRoute
   ApiProgressPhotosRoute: typeof ApiProgressPhotosRoute
   ApiProgressReportRoute: typeof ApiProgressReportRoute
+  ApiPtUnavailableDaysRoute: typeof ApiPtUnavailableDaysRouteWithChildren
   ApiPtsRoute: typeof ApiPtsRoute
   ApiSigninRoute: typeof ApiSigninRoute
   ApiSignoutRoute: typeof ApiSignoutRoute
@@ -579,8 +863,22 @@ export interface RootRouteChildren {
   ApiWeeklyAnalysisRoute: typeof ApiWeeklyAnalysisRoute
   ApiAdminStatsRoute: typeof ApiAdminStatsRoute
   ApiAdminUsersRoute: typeof ApiAdminUsersRoute
+  ApiCustomerMembershipsRoute: typeof ApiCustomerMembershipsRoute
+  ApiCustomerPackageRequestsRoute: typeof ApiCustomerPackageRequestsRoute
   ApiLogNutritionReportRoute: typeof ApiLogNutritionReportRoute
   ApiLogWorkoutRoute: typeof ApiLogWorkoutRoute
+  ApiManagerEventsRoute: typeof ApiManagerEventsRoute
+  ApiManagerMembershipsRoute: typeof ApiManagerMembershipsRoute
+  ApiManagerPackagesRoute: typeof ApiManagerPackagesRoute
+  ApiManagerPaymentsRoute: typeof ApiManagerPaymentsRoute
+  ApiManagerPromotionsRoute: typeof ApiManagerPromotionsRoute
+  ApiManagerPurchaseRequestsRoute: typeof ApiManagerPurchaseRequestsRoute
+  ApiManagerServicesRoute: typeof ApiManagerServicesRoute
+  ApiPtServicesRoute: typeof ApiPtServicesRoute
+  ApiPublicEventsRoute: typeof ApiPublicEventsRoute
+  ApiPublicLandingRoute: typeof ApiPublicLandingRoute
+  ApiPublicPackagesRoute: typeof ApiPublicPackagesRoute
+  ApiPublicPtsRoute: typeof ApiPublicPtsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -655,6 +953,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPtsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pt-unavailable-days': {
+      id: '/api/pt-unavailable-days'
+      path: '/api/pt-unavailable-days'
+      fullPath: '/api/pt-unavailable-days'
+      preLoaderRoute: typeof ApiPtUnavailableDaysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/progress-report': {
       id: '/api/progress-report'
       path: '/api/progress-report'
@@ -690,11 +995,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPlanFeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/password': {
+      id: '/api/password'
+      path: '/api/password'
+      fullPath: '/api/password'
+      preLoaderRoute: typeof ApiPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/inbody': {
       id: '/api/inbody'
       path: '/api/inbody'
       fullPath: '/api/inbody'
       preLoaderRoute: typeof ApiInbodyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/guest-meetings': {
+      id: '/api/guest-meetings'
+      path: '/api/guest-meetings'
+      fullPath: '/api/guest-meetings'
+      preLoaderRoute: typeof ApiGuestMeetingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/guest-meeting-options': {
+      id: '/api/guest-meeting-options'
+      path: '/api/guest-meeting-options'
+      fullPath: '/api/guest-meeting-options'
+      preLoaderRoute: typeof ApiGuestMeetingOptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/feed': {
@@ -802,6 +1128,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPlansRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/packages': {
+      id: '/_authenticated/packages'
+      path: '/packages'
+      fullPath: '/packages'
+      preLoaderRoute: typeof AuthenticatedPackagesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/nutrition': {
       id: '/_authenticated/nutrition'
       path: '/nutrition'
@@ -830,6 +1163,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClassesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/change-password': {
+      id: '/_authenticated/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof AuthenticatedChangePasswordRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/bookings': {
       id: '/_authenticated/bookings'
       path: '/bookings'
@@ -851,6 +1191,97 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/public/pts': {
+      id: '/api/public/pts'
+      path: '/api/public/pts'
+      fullPath: '/api/public/pts'
+      preLoaderRoute: typeof ApiPublicPtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/packages': {
+      id: '/api/public/packages'
+      path: '/api/public/packages'
+      fullPath: '/api/public/packages'
+      preLoaderRoute: typeof ApiPublicPackagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/landing': {
+      id: '/api/public/landing'
+      path: '/api/public/landing'
+      fullPath: '/api/public/landing'
+      preLoaderRoute: typeof ApiPublicLandingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/events': {
+      id: '/api/public/events'
+      path: '/api/public/events'
+      fullPath: '/api/public/events'
+      preLoaderRoute: typeof ApiPublicEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pt/services': {
+      id: '/api/pt/services'
+      path: '/api/pt/services'
+      fullPath: '/api/pt/services'
+      preLoaderRoute: typeof ApiPtServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pt-unavailable-days/import-preview': {
+      id: '/api/pt-unavailable-days/import-preview'
+      path: '/import-preview'
+      fullPath: '/api/pt-unavailable-days/import-preview'
+      preLoaderRoute: typeof ApiPtUnavailableDaysImportPreviewRouteImport
+      parentRoute: typeof ApiPtUnavailableDaysRoute
+    }
+    '/api/manager/services': {
+      id: '/api/manager/services'
+      path: '/api/manager/services'
+      fullPath: '/api/manager/services'
+      preLoaderRoute: typeof ApiManagerServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/manager/purchase-requests': {
+      id: '/api/manager/purchase-requests'
+      path: '/api/manager/purchase-requests'
+      fullPath: '/api/manager/purchase-requests'
+      preLoaderRoute: typeof ApiManagerPurchaseRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/manager/promotions': {
+      id: '/api/manager/promotions'
+      path: '/api/manager/promotions'
+      fullPath: '/api/manager/promotions'
+      preLoaderRoute: typeof ApiManagerPromotionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/manager/payments': {
+      id: '/api/manager/payments'
+      path: '/api/manager/payments'
+      fullPath: '/api/manager/payments'
+      preLoaderRoute: typeof ApiManagerPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/manager/packages': {
+      id: '/api/manager/packages'
+      path: '/api/manager/packages'
+      fullPath: '/api/manager/packages'
+      preLoaderRoute: typeof ApiManagerPackagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/manager/memberships': {
+      id: '/api/manager/memberships'
+      path: '/api/manager/memberships'
+      fullPath: '/api/manager/memberships'
+      preLoaderRoute: typeof ApiManagerMembershipsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/manager/events': {
+      id: '/api/manager/events'
+      path: '/api/manager/events'
+      fullPath: '/api/manager/events'
+      preLoaderRoute: typeof ApiManagerEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/log/workout': {
       id: '/api/log/workout'
       path: '/api/log/workout'
@@ -864,6 +1295,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/log/nutrition-report'
       preLoaderRoute: typeof ApiLogNutritionReportRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/customer/package-requests': {
+      id: '/api/customer/package-requests'
+      path: '/api/customer/package-requests'
+      fullPath: '/api/customer/package-requests'
+      preLoaderRoute: typeof ApiCustomerPackageRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/customer/memberships': {
+      id: '/api/customer/memberships'
+      path: '/api/customer/memberships'
+      fullPath: '/api/customer/memberships'
+      preLoaderRoute: typeof ApiCustomerMembershipsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat/threads': {
+      id: '/api/chat/threads'
+      path: '/threads'
+      fullPath: '/api/chat/threads'
+      preLoaderRoute: typeof ApiChatThreadsRouteImport
+      parentRoute: typeof ApiChatRoute
+    }
+    '/api/chat/thread': {
+      id: '/api/chat/thread'
+      path: '/thread'
+      fullPath: '/api/chat/thread'
+      preLoaderRoute: typeof ApiChatThreadRouteImport
+      parentRoute: typeof ApiChatRoute
     }
     '/api/admin/users': {
       id: '/api/admin/users'
@@ -900,10 +1359,12 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalysesRoute: typeof AuthenticatedAnalysesRoute
   AuthenticatedBookingsRoute: typeof AuthenticatedBookingsRoute
+  AuthenticatedChangePasswordRoute: typeof AuthenticatedChangePasswordRoute
   AuthenticatedClassesRoute: typeof AuthenticatedClassesRoute
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedInbodyRoute: typeof AuthenticatedInbodyRoute
   AuthenticatedNutritionRoute: typeof AuthenticatedNutritionRoute
+  AuthenticatedPackagesRoute: typeof AuthenticatedPackagesRoute
   AuthenticatedPlansRoute: typeof AuthenticatedPlansRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedProgressRoute: typeof AuthenticatedProgressRoute
@@ -919,10 +1380,12 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalysesRoute: AuthenticatedAnalysesRoute,
   AuthenticatedBookingsRoute: AuthenticatedBookingsRoute,
+  AuthenticatedChangePasswordRoute: AuthenticatedChangePasswordRoute,
   AuthenticatedClassesRoute: AuthenticatedClassesRoute,
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedInbodyRoute: AuthenticatedInbodyRoute,
   AuthenticatedNutritionRoute: AuthenticatedNutritionRoute,
+  AuthenticatedPackagesRoute: AuthenticatedPackagesRoute,
   AuthenticatedPlansRoute: AuthenticatedPlansRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedProgressRoute: AuthenticatedProgressRoute,
@@ -938,6 +1401,31 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface ApiChatRouteChildren {
+  ApiChatThreadRoute: typeof ApiChatThreadRoute
+  ApiChatThreadsRoute: typeof ApiChatThreadsRoute
+}
+
+const ApiChatRouteChildren: ApiChatRouteChildren = {
+  ApiChatThreadRoute: ApiChatThreadRoute,
+  ApiChatThreadsRoute: ApiChatThreadsRoute,
+}
+
+const ApiChatRouteWithChildren =
+  ApiChatRoute._addFileChildren(ApiChatRouteChildren)
+
+interface ApiPtUnavailableDaysRouteChildren {
+  ApiPtUnavailableDaysImportPreviewRoute: typeof ApiPtUnavailableDaysImportPreviewRoute
+}
+
+const ApiPtUnavailableDaysRouteChildren: ApiPtUnavailableDaysRouteChildren = {
+  ApiPtUnavailableDaysImportPreviewRoute:
+    ApiPtUnavailableDaysImportPreviewRoute,
+}
+
+const ApiPtUnavailableDaysRouteWithChildren =
+  ApiPtUnavailableDaysRoute._addFileChildren(ApiPtUnavailableDaysRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
@@ -945,18 +1433,22 @@ const rootRouteChildren: RootRouteChildren = {
   GetStartedRoute: GetStartedRoute,
   ApiAnalysesRoute: ApiAnalysesRoute,
   ApiBookingsRoute: ApiBookingsRoute,
-  ApiChatRoute: ApiChatRoute,
+  ApiChatRoute: ApiChatRouteWithChildren,
   ApiClassesRoute: ApiClassesRoute,
   ApiCurrentUserRoute: ApiCurrentUserRoute,
   ApiCustomersRoute: ApiCustomersRoute,
   ApiDebugEchoRoute: ApiDebugEchoRoute,
   ApiFeedRoute: ApiFeedRoute,
+  ApiGuestMeetingOptionsRoute: ApiGuestMeetingOptionsRoute,
+  ApiGuestMeetingsRoute: ApiGuestMeetingsRoute,
   ApiInbodyRoute: ApiInbodyRoute,
+  ApiPasswordRoute: ApiPasswordRoute,
   ApiPlanFeedbackRoute: ApiPlanFeedbackRoute,
   ApiPlansRoute: ApiPlansRoute,
   ApiProfileRoute: ApiProfileRoute,
   ApiProgressPhotosRoute: ApiProgressPhotosRoute,
   ApiProgressReportRoute: ApiProgressReportRoute,
+  ApiPtUnavailableDaysRoute: ApiPtUnavailableDaysRouteWithChildren,
   ApiPtsRoute: ApiPtsRoute,
   ApiSigninRoute: ApiSigninRoute,
   ApiSignoutRoute: ApiSignoutRoute,
@@ -965,8 +1457,22 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWeeklyAnalysisRoute: ApiWeeklyAnalysisRoute,
   ApiAdminStatsRoute: ApiAdminStatsRoute,
   ApiAdminUsersRoute: ApiAdminUsersRoute,
+  ApiCustomerMembershipsRoute: ApiCustomerMembershipsRoute,
+  ApiCustomerPackageRequestsRoute: ApiCustomerPackageRequestsRoute,
   ApiLogNutritionReportRoute: ApiLogNutritionReportRoute,
   ApiLogWorkoutRoute: ApiLogWorkoutRoute,
+  ApiManagerEventsRoute: ApiManagerEventsRoute,
+  ApiManagerMembershipsRoute: ApiManagerMembershipsRoute,
+  ApiManagerPackagesRoute: ApiManagerPackagesRoute,
+  ApiManagerPaymentsRoute: ApiManagerPaymentsRoute,
+  ApiManagerPromotionsRoute: ApiManagerPromotionsRoute,
+  ApiManagerPurchaseRequestsRoute: ApiManagerPurchaseRequestsRoute,
+  ApiManagerServicesRoute: ApiManagerServicesRoute,
+  ApiPtServicesRoute: ApiPtServicesRoute,
+  ApiPublicEventsRoute: ApiPublicEventsRoute,
+  ApiPublicLandingRoute: ApiPublicLandingRoute,
+  ApiPublicPackagesRoute: ApiPublicPackagesRoute,
+  ApiPublicPtsRoute: ApiPublicPtsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

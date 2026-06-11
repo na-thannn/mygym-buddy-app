@@ -7,7 +7,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -15,11 +15,11 @@ async function requireSession() {
 export const getProfile = createServerFn({ method: "GET" }).handler(async () => {
   const session = await requireSession();
   const { db, schema } = await import("@/server/db");
-  const row = db
+  const [row] = await db
     .select()
     .from(schema.profiles)
     .where(eq(schema.profiles.userId, session.userId))
-    .get();
+    .limit(1);
   return row ?? null;
 });
 
@@ -39,19 +39,17 @@ export const saveProfile = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const session = await requireSession();
     const { db, schema } = await import("@/server/db");
-    const existing = db
+    const [existing] = await db
       .select({ userId: schema.profiles.userId })
       .from(schema.profiles)
       .where(eq(schema.profiles.userId, session.userId))
-      .get();
+      .limit(1);
     const patch = { ...data, updatedAt: new Date().toISOString() };
     if (existing) {
-      db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, session.userId)).run();
+      await db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, session.userId));
     } else {
       try {
-        db.insert(schema.profiles)
-          .values({ userId: session.userId, ...patch })
-          .run();
+        await db.insert(schema.profiles).values({ userId: session.userId, ...patch });
         return { ok: true };
       } catch (err) {
         await logDevError({ error: err, req: null }).catch(() => {});

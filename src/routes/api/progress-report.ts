@@ -11,15 +11,14 @@ export const Route = createFileRoute("/api/progress-report")({
     handlers: {
       GET: async () => {
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
-        const rows = db
+        const rows = await db
           .select()
           .from(schema.progressReports)
           .where(eq(schema.progressReports.userId, session.userId))
           .orderBy(desc(schema.progressReports.reportDate))
-          .limit(50)
-          .all();
+          .limit(50);
         return new Response(JSON.stringify(rows), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -29,7 +28,7 @@ export const Route = createFileRoute("/api/progress-report")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -45,7 +44,8 @@ export const Route = createFileRoute("/api/progress-report")({
           });
         const id = newId();
         try {
-          db.insert(schema.progressReports)
+          await db
+            .insert(schema.progressReports)
             .values({
               id,
               userId: session.userId,
@@ -54,8 +54,7 @@ export const Route = createFileRoute("/api/progress-report")({
               streakDays: (bodyObj["streakDays"] as number) ?? 0,
               totalVolume: (bodyObj["totalVolume"] as number) ?? 0,
               notes: (bodyObj["notes"] as string) ?? null,
-            })
-            .run();
+            });
           return new Response(JSON.stringify({ ok: true, id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

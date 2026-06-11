@@ -1,53 +1,91 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  validateUIMessages,
+  type UIMessage,
+} from "ai";
 import { getSessionUser } from "@/server/auth";
 import { getGroq, ALEX_MODEL_ID } from "@/lib/trainer/groq";
 import { buildAlexTools } from "@/lib/trainer/tools";
 import { parseRequestBody } from "@/lib/request-utils";
-import type { MaybeWrappedRequest } from "@/types/dev";
+import { buildTrainerContext, formatYmd } from "@/lib/trainer/context";
+import { buildAlexSystemPrompt } from "@/lib/trainer/prompts";
+import { loadChatThread, saveChatMessages } from "@/lib/trainer/chat-store";
 
-const SYSTEM = `You are Alex, a certified personal trainer chatbot for HL Fitness members.
-Your job is to coach the user through fitness with warmth, expertise, and structure.
-
-Topics you handle (each maps to tools):
-1. Profile onboarding — collect goal, level, limitations, age, weight via save_profile.
-2. Workout planning — ask days/week and equipment, then generate_workout_plan.
-3. Logging completed workouts — log_workout_entry, loop "log another?".
-4. Daily nutrition reports — log_nutrition_report (auto-estimates macros).
-5. Weekly progress reports — log_progress_report.
-6. Progress analysis — call get_plan_for_date + get_workouts_since, then analyze_progress.
-7. Motivation, rest-day advice, general Q&A — answer directly.
-8. Human support escalation — if the user asks for staff/PT help or says the AI did not solve their issue, collect a short subject and summary, then call create_support_ticket.
-
-RULES:
-- Ask the user one focused question at a time during data collection.
-- Always pass today's date as YYYY-MM-DD when needed (today is ${new Date().toISOString().slice(0, 10)}).
-- Use Markdown in your replies (lists, tables, **bold**).
-- Be encouraging but honest. Cite specifics from their saved data when relevant.
-- If a user asks about something off-topic from fitness, briefly say it's outside your scope.`;
+type AiTools = NonNullable<Parameters<typeof streamText>[0]["tools"]>;
 
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
-        const session = getSessionUser();
-        if (!session) return new Response("Unauthorized", { status: 401 });
-        const body: unknown = await parseRequestBody(request as unknown);
-        const bodyObj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-        const messages = (bodyObj["messages"] as UIMessage[]) ?? [];
-        const groq = getGroq();
-        const tools = buildAlexTools(session.userId);
-
-        const result = streamText({
-          model: groq(ALEX_MODEL_ID),
-          system: SYSTEM,
-          messages: await convertToModelMessages(messages),
-          tools,
-          stopWhen: stepCountIs(50),
-        });
-
-        return result.toUIMessageStreamResponse();
-      },
+      POST: async ({ request }) => handleChatPost(request as unknown as Request),
     },
   },
 });
+
+export async function handleChatPost(request: Request) {
+  const session = await getSessionUser();
+  if (!session) return new Response("Unauthorized", { status: 401 });
+
+  const body: unknown = await parseRequestBody(request as unknown);
+  const bodyObj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const threadId = typeof bodyObj["id"] === "string" ? bodyObj["id"] : "";
+  const message = bodyObj["message"] as UIMessage | undefined;
+
+  if (!threadId || !message) {
+    return json({ error: "Missing chat id or message" }, 400);
+  }
+
+  const thread = await loadChatThread({ userId: session.userId, threadId });
+  if (!thread) return json({ error: "Chat thread not found" }, 404);
+
+  const tools = buildAlexTools(session.userId);
+  const aiTools = tools as unknown as AiTools;
+  let validatedMessages: UIMessage[];
+  try {
+    validatedMessages = await validateUIMessages({
+      messages: [...thread.messages, message],
+      tools: aiTools,
+    });
+  } catch {
+    return json({ error: "Invalid chat message" }, 400);
+  }
+
+  let groq;
+  try {
+    groq = getGroq();
+  } catch {
+    return json({ error: "Missing GROQ_API_KEY" }, 400);
+  }
+
+  const context = await buildTrainerContext({ userId: session.userId });
+  const system = buildAlexSystemPrompt({
+    today: formatYmd(new Date()),
+    contextText: context.text,
+  });
+
+  const result = streamText({
+    model: groq(ALEX_MODEL_ID),
+    system,
+    messages: await convertToModelMessages(validatedMessages),
+    tools: aiTools,
+    stopWhen: stepCountIs(50),
+  });
+
+  void result.consumeStream?.();
+
+  return result.toUIMessageStreamResponse({
+    originalMessages: validatedMessages,
+    onFinish: async ({ messages }) => {
+      await saveChatMessages({ userId: session.userId, threadId, messages });
+    },
+  });
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}

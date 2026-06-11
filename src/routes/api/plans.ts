@@ -11,15 +11,14 @@ export const Route = createFileRoute("/api/plans")({
     handlers: {
       GET: async () => {
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
-        const rows = db
+        const rows = await db
           .select()
           .from(schema.workoutPlanDocs)
           .where(eq(schema.workoutPlanDocs.userId, session.userId))
           .orderBy(desc(schema.workoutPlanDocs.planDate), desc(schema.workoutPlanDocs.createdAt))
-          .limit(100)
-          .all();
+          .limit(100);
         return new Response(JSON.stringify(rows), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -29,7 +28,7 @@ export const Route = createFileRoute("/api/plans")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -49,15 +48,15 @@ export const Route = createFileRoute("/api/plans")({
           });
         const id = newId();
         try {
-          db.insert(schema.workoutPlanDocs)
+          await db
+            .insert(schema.workoutPlanDocs)
             .values({
               id,
               userId: session.userId,
               planDate: bodyObj["planDate"] as string,
               title: (bodyObj["title"] as string) ?? null,
               contentMd: bodyObj["contentMd"] as string,
-            })
-            .run();
+            });
           return new Response(JSON.stringify({ ok: true, id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

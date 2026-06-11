@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { getProfile, saveProfile } from "@/lib/profile.functions";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@/lib/authContext";
+import { buildProfileSetupSummary, type ProfileSetupItem } from "@/lib/customer-experience";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import {
+  CheckCircle2,
+  CircleDashed,
+  Dumbbell,
+  Loader2,
+  MessageCircle,
+  Scale,
+  ShieldCheck,
+  Target,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/profile")({
-  head: () => ({ meta: [{ title: "Profile — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Profile - HL Fitness" }] }),
   component: ProfilePage,
 });
 
@@ -44,11 +53,20 @@ const EMPTY: Form = {
   targetWeightKg: "",
 };
 
+const SETUP_ICONS = {
+  training: Target,
+  body: Scale,
+  safety: ShieldCheck,
+} satisfies Record<ProfileSetupItem["id"], typeof Target>;
+
 function ProfilePage() {
   const { user } = useAuth();
   const [f, setF] = useState<Form>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const setup = useMemo(() => buildProfileSetupSummary(f), [f]);
+
   const fetchProfile = async () => {
     const res = await fetch("/api/profile", { credentials: "include" });
     if (!res.ok) return null;
@@ -67,21 +85,30 @@ function ProfilePage() {
   };
 
   useEffect(() => {
-    fetchProfile().then((p) => {
-      if (p) {
-        setF({
-          goal: p.goal ?? "",
-          level: p.level ?? "",
-          limitations: p.limitations ?? "",
-          age: p.age?.toString() ?? "",
-          gender: p.gender ?? "",
-          heightCm: p.heightCm?.toString() ?? "",
-          weightKg: p.weightKg?.toString() ?? "",
-          targetWeightKg: p.targetWeightKg?.toString() ?? "",
-        });
-      }
-      setLoaded(true);
-    });
+    let cancelled = false;
+    fetchProfile()
+      .then((p) => {
+        if (cancelled) return;
+        if (p) {
+          setF({
+            goal: p.goal ?? "",
+            level: p.level ?? "",
+            limitations: p.limitations ?? "",
+            age: p.age?.toString() ?? "",
+            gender: p.gender ?? "",
+            heightCm: p.heightCm?.toString() ?? "",
+            weightKg: p.weightKg?.toString() ?? "",
+            targetWeightKg: p.targetWeightKg?.toString() ?? "",
+          });
+        }
+      })
+      .catch(() => toast.error("Failed to load profile"))
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const save = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -109,105 +136,244 @@ function ProfilePage() {
     }
   };
 
-  if (!loaded) return <div className="p-6 text-sm text-slate-400">Loading…</div>;
+  if (!loaded) {
+    return (
+      <div className="mx-auto max-w-5xl p-4 md:p-8">
+        <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-6 text-sm text-stone-400">
+          Loading profile...
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-2xl mx-auto p-4 md:p-6">
-      <PageHeader title="Profile" subtitle={`Signed in as ${user?.email ?? ""}`} />
-      <form
-        onSubmit={save}
-        className="space-y-5 rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-5 animate-fade-up"
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label>Goal</Label>
-            <Input
-              value={f.goal}
-              onChange={(e) => setF({ ...f, goal: e.target.value })}
-              placeholder="Fat loss, lean mass, performance"
+    <div className="mx-auto max-w-5xl p-4 pb-24 md:p-8">
+      <PageHeader
+        title="Coach profile"
+        subtitle={`Signed in as ${user?.email ?? ""}`}
+        action={
+          <Button
+            asChild
+            variant="outline"
+            className="rounded-xl border-white/10 bg-white/[0.04] text-stone-100 hover:bg-white/[0.08]"
+          >
+            <Link to="/trainer">
+              Ask Alex <MessageCircle className="ml-2 size-4" />
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+        <form onSubmit={save} className="space-y-5">
+          <section className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 animate-fade-up">
+            <SectionHeader
+              icon={Dumbbell}
+              title="Training context"
+              description="Tell Alex what you are working toward and how experienced you are."
             />
-          </div>
-          <div className="space-y-1">
-            <Label>Level</Label>
-            <Select value={f.level} onValueChange={(v) => setF({ ...f, level: v })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Beginner">Beginner</SelectItem>
-                <SelectItem value="Intermediate">Intermediate</SelectItem>
-                <SelectItem value="Advanced">Advanced</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Age</Label>
-            <Input
-              type="number"
-              value={f.age}
-              onChange={(e) => setF({ ...f, age: e.target.value })}
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <Field label="Goal">
+                <Input
+                  value={f.goal}
+                  onChange={(e) => setF({ ...f, goal: e.target.value })}
+                  placeholder="Fat loss, lean mass, performance"
+                />
+              </Field>
+              <Field label="Training level">
+                <Select value={f.level} onValueChange={(v) => setF({ ...f, level: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Beginner">Beginner</SelectItem>
+                    <SelectItem value="Intermediate">Intermediate</SelectItem>
+                    <SelectItem value="Advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 animate-fade-up stagger-1">
+            <SectionHeader
+              icon={Scale}
+              title="Body baseline"
+              description="These numbers help progress reviews stay grounded in your actual starting point."
             />
-          </div>
-          <div className="space-y-1">
-            <Label>Gender</Label>
-            <Select value={f.gender} onValueChange={(v) => setF({ ...f, gender: v })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="male">Male</SelectItem>
-                <SelectItem value="female">Female</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Height (cm)</Label>
-            <Input
-              type="number"
-              step="0.1"
-              value={f.heightCm}
-              onChange={(e) => setF({ ...f, heightCm: e.target.value })}
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <Field label="Age">
+                <Input
+                  type="number"
+                  value={f.age}
+                  onChange={(e) => setF({ ...f, age: e.target.value })}
+                />
+              </Field>
+              <Field label="Gender">
+                <Select value={f.gender} onValueChange={(v) => setF({ ...f, gender: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Height (cm)">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={f.heightCm}
+                  onChange={(e) => setF({ ...f, heightCm: e.target.value })}
+                />
+              </Field>
+              <Field label="Current weight (kg)">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={f.weightKg}
+                  onChange={(e) => setF({ ...f, weightKg: e.target.value })}
+                />
+              </Field>
+              <Field label="Target weight (kg)">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={f.targetWeightKg}
+                  onChange={(e) => setF({ ...f, targetWeightKg: e.target.value })}
+                />
+              </Field>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 animate-fade-up stagger-2">
+            <SectionHeader
+              icon={ShieldCheck}
+              title="Safety context"
+              description="Add anything a coach should remember before suggesting exercises or intensity."
             />
+            <div className="mt-5">
+              <Field label="Limitations or injuries">
+                <Textarea
+                  rows={4}
+                  maxLength={500}
+                  value={f.limitations}
+                  onChange={(e) => setF({ ...f, limitations: e.target.value })}
+                  placeholder="Lower back pain, shoulder issue, or none"
+                />
+              </Field>
+            </div>
+          </section>
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-stone-50">Save this context</div>
+              <p className="mt-1 text-xs leading-5 text-stone-400">
+                Alex and your coaches can use it for safer, more relevant guidance.
+              </p>
+            </div>
+            <Button
+              type="submit"
+              disabled={saving}
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Save profile
+            </Button>
           </div>
-          <div className="space-y-1">
-            <Label>Weight (kg)</Label>
-            <Input
-              type="number"
-              step="0.1"
-              value={f.weightKg}
-              onChange={(e) => setF({ ...f, weightKg: e.target.value })}
-            />
+        </form>
+
+        <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-5 shadow-[0_28px_80px_-62px_rgba(244,179,43,0.75)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-medium text-primary">Alex readiness</div>
+                <div className="mt-2 text-3xl font-semibold text-stone-50">{setup.percent}%</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-stone-300">
+                {setup.completedCount} / {setup.totalCount}
+              </div>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${setup.percent}%` }}
+              />
+            </div>
+            <p className="mt-4 text-sm leading-6 text-stone-400">
+              A fuller profile helps Alex write plans, explain progress, and flag when human coach
+              input matters.
+            </p>
           </div>
-          <div className="space-y-1">
-            <Label>Target weight (kg)</Label>
-            <Input
-              type="number"
-              step="0.1"
-              value={f.targetWeightKg}
-              onChange={(e) => setF({ ...f, targetWeightKg: e.target.value })}
-            />
+
+          <div className="space-y-3">
+            {setup.items.map((item) => (
+              <SetupCard key={item.id} item={item} />
+            ))}
           </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof Dumbbell;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+        <Icon className="size-5" />
+      </div>
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight text-stone-50">{title}</h2>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-400">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function SetupCard({ item }: { item: ProfileSetupItem }) {
+  const Icon = SETUP_ICONS[item.id];
+  const StateIcon = item.complete ? CheckCircle2 : CircleDashed;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex items-start gap-3">
+        <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+          <Icon className="size-4" />
         </div>
-        <div className="space-y-1">
-          <Label>Limitations or injuries</Label>
-          <Textarea
-            rows={2}
-            maxLength={500}
-            value={f.limitations}
-            onChange={(e) => setF({ ...f, limitations: e.target.value })}
-            placeholder="Lower back pain, shoulder issue"
-          />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-stone-50">{item.title}</h3>
+            <StateIcon
+              className={item.complete ? "size-4 text-primary" : "size-4 text-stone-500"}
+            />
+          </div>
+          <div className="mt-1 text-xs font-medium text-primary">{item.status}</div>
+          <p className="mt-2 text-xs leading-5 text-stone-400">{item.detail}</p>
+          {item.missing.length > 0 && (
+            <div className="mt-3 text-xs text-stone-500">Missing: {item.missing.join(", ")}</div>
+          )}
         </div>
-        <Button
-          type="submit"
-          disabled={saving}
-          className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
-        >
-          {saving && <Loader2 className="size-4 mr-2 animate-spin" />}
-          Save profile
-        </Button>
-      </form>
+      </div>
     </div>
   );
 }

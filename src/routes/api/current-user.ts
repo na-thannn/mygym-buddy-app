@@ -5,7 +5,7 @@ export const Route = createFileRoute("/api/current-user")({
   server: {
     handlers: {
       GET: async () => {
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) return new Response(null, { status: 204 });
         return new Response(
           JSON.stringify({
@@ -13,6 +13,7 @@ export const Route = createFileRoute("/api/current-user")({
             email: session.email,
             displayName: session.displayName,
             role: session.role,
+            mustChangePassword: session.mustChangePassword,
           }),
           {
             status: 200,

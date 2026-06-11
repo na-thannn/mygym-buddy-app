@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hl-fitness-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hlfitness
+      POSTGRES_USER: hlfitness
+      POSTGRES_PASSWORD: hlfitness
+    ports:
+      - "5432:5432"
+    volumes:
+      - hl_fitness_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hlfitness -d hlfitness"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hl_fitness_postgres:

@@ -6,7 +6,7 @@ export const Route = createFileRoute("/api/signout")({
     handlers: {
       POST: async () => {
         const token = readSessionCookie();
-        if (token) invalidateSessionToken(token);
+        if (token) await invalidateSessionToken(token);
         clearSessionCookie();
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,

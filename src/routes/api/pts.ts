@@ -7,9 +7,9 @@ export const Route = createFileRoute("/api/pts")({
   server: {
     handlers: {
       GET: async () => {
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) return json({ error: "Unauthorized" }, 401);
-        const pts = db
+        const pts = await db
           .select({
             id: schema.users.id,
             displayName: schema.users.displayName,
@@ -17,8 +17,7 @@ export const Route = createFileRoute("/api/pts")({
           })
           .from(schema.users)
           .where(eq(schema.users.role, "pt"))
-          .orderBy(asc(schema.users.displayName))
-          .all();
+          .orderBy(asc(schema.users.displayName));
         return json({ pts });
       },
     },

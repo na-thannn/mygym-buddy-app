@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/bookings")({
       GET: async (ctx: unknown) => {
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/api/bookings")({
         const where: SQL[] = [];
         if (session.role === "customer") where.push(eq(schema.bookings.customerId, session.userId));
         else if (session.role === "pt") where.push(eq(schema.bookings.ptId, session.userId));
-        if (hasAnyRole(session, ["admin", "staff"])) {
+        if (hasAnyRole(session, ["admin", "manager"])) {
           if (forUserId) where.push(eq(schema.bookings.customerId, forUserId));
           if (forPtId) where.push(eq(schema.bookings.ptId, forPtId));
         }
@@ -36,19 +36,17 @@ export const Route = createFileRoute("/api/bookings")({
 
         try {
           const rows = where.length
-            ? db
+            ? await db
                 .select()
                 .from(schema.bookings)
                 .where(and(...where))
                 .orderBy(desc(schema.bookings.scheduledAt))
                 .limit(limit)
-                .all()
-            : db
+            : await db
                 .select()
                 .from(schema.bookings)
                 .orderBy(desc(schema.bookings.scheduledAt))
-                .limit(limit)
-                .all();
+                .limit(limit);
           return new Response(JSON.stringify(rows), {
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -66,7 +64,7 @@ export const Route = createFileRoute("/api/bookings")({
       POST: async (ctx: unknown) => {
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -93,10 +91,10 @@ export const Route = createFileRoute("/api/bookings")({
           let customerId = session.userId;
           if (session.role === "customer") {
             customerId = session.userId;
-          } else if (hasAnyRole(session, ["admin", "staff"]) && requestedCustomerId) {
+          } else if (hasAnyRole(session, ["admin", "manager"]) && requestedCustomerId) {
             customerId = requestedCustomerId;
           } else if (session.role === "pt" && requestedCustomerId) {
-            const assigned = db
+            const [assigned] = await db
               .select({ id: schema.users.id })
               .from(schema.users)
               .where(
@@ -105,7 +103,7 @@ export const Route = createFileRoute("/api/bookings")({
                   eq(schema.users.assignedPtId, session.userId),
                 ),
               )
-              .get();
+              .limit(1);
             if (!assigned) {
               return new Response(
                 JSON.stringify({ error: "PT can only book assigned customers" }),
@@ -123,7 +121,7 @@ export const Route = createFileRoute("/api/bookings")({
             });
           }
 
-          const customer = db
+          const [customer] = await db
             .select({
               id: schema.users.id,
               role: schema.users.role,
@@ -131,7 +129,7 @@ export const Route = createFileRoute("/api/bookings")({
             })
             .from(schema.users)
             .where(eq(schema.users.id, customerId))
-            .get();
+            .limit(1);
           if (!customer || customer.role !== "customer") {
             return new Response(JSON.stringify({ error: "Customer not found" }), {
               status: 400,
@@ -141,11 +139,11 @@ export const Route = createFileRoute("/api/bookings")({
 
           const ptId = requestedPtId ?? customer.assignedPtId ?? null;
           if (ptId) {
-            const pt = db
+            const [pt] = await db
               .select({ id: schema.users.id, role: schema.users.role })
               .from(schema.users)
               .where(eq(schema.users.id, ptId))
-              .get();
+              .limit(1);
             if (!pt || pt.role !== "pt") {
               return new Response(JSON.stringify({ error: "PT not found" }), {
                 status: 400,
@@ -155,7 +153,8 @@ export const Route = createFileRoute("/api/bookings")({
           }
 
           const id = newId();
-          db.insert(schema.bookings)
+          await db
+            .insert(schema.bookings)
             .values({
               id,
               customerId,
@@ -163,8 +162,7 @@ export const Route = createFileRoute("/api/bookings")({
               scheduledAt,
               durationMinutes,
               notes,
-            })
-            .run();
+            });
           return new Response(JSON.stringify({ ok: true, id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -183,7 +181,7 @@ export const Route = createFileRoute("/api/bookings")({
       PATCH: async (ctx: unknown) => {
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -206,7 +204,11 @@ export const Route = createFileRoute("/api/bookings")({
           });
         }
         try {
-          const row = db.select().from(schema.bookings).where(eq(schema.bookings.id, id)).get();
+          const [row] = await db
+            .select()
+            .from(schema.bookings)
+            .where(eq(schema.bookings.id, id))
+            .limit(1);
           if (!row)
             return new Response(JSON.stringify({ error: "Not found" }), {
               status: 404,
@@ -225,7 +227,7 @@ export const Route = createFileRoute("/api/bookings")({
           if (action === "accept") {
             updates.status = "confirmed";
             if (session.role === "pt") updates.ptId = session.userId;
-            if (typeof body?.ptId === "string" && hasAnyRole(session, ["admin", "staff"])) {
+            if (typeof body?.ptId === "string" && hasAnyRole(session, ["admin", "manager"])) {
               updates.ptId = body.ptId.trim() || null;
             }
           } else if (action === "decline") {
@@ -258,7 +260,7 @@ export const Route = createFileRoute("/api/bookings")({
             });
           }
 
-          db.update(schema.bookings).set(updates).where(eq(schema.bookings.id, id)).run();
+          await db.update(schema.bookings).set(updates).where(eq(schema.bookings.id, id));
           return new Response(JSON.stringify({ ok: true }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

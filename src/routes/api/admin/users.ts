@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/admin/users")({
   server: {
     handlers: {
       GET: async () => {
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/api/admin/users")({
         }
 
         try {
-          const users = db
+          const users = await db
             .select({
               id: schema.users.id,
               email: schema.users.email,
@@ -46,10 +46,9 @@ export const Route = createFileRoute("/api/admin/users")({
             })
             .from(schema.users)
             .orderBy(desc(schema.users.createdAt))
-            .limit(500)
-            .all();
+            .limit(500);
 
-          const pts = db
+          const pts = await db
             .select({
               id: schema.users.id,
               email: schema.users.email,
@@ -57,8 +56,7 @@ export const Route = createFileRoute("/api/admin/users")({
             })
             .from(schema.users)
             .where(eq(schema.users.role, "pt"))
-            .orderBy(desc(schema.users.createdAt))
-            .all();
+            .orderBy(desc(schema.users.createdAt));
 
           return new Response(JSON.stringify({ users, pts }), {
             status: 200,
@@ -77,7 +75,7 @@ export const Route = createFileRoute("/api/admin/users")({
       POST: async (ctx: unknown) => {
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -109,11 +107,11 @@ export const Route = createFileRoute("/api/admin/users")({
           });
         }
 
-        const existing = db
+        const [existing] = await db
           .select({ role: schema.users.role })
           .from(schema.users)
           .where(eq(schema.users.id, data.id))
-          .get();
+          .limit(1);
         if (!existing) {
           return new Response(JSON.stringify({ error: "User not found" }), {
             status: 404,
@@ -139,11 +137,11 @@ export const Route = createFileRoute("/api/admin/users")({
           }
           const trimmed = data.assignedPtId ? data.assignedPtId.trim() : null;
           if (trimmed) {
-            const pt = db
+            const [pt] = await db
               .select({ id: schema.users.id, role: schema.users.role })
               .from(schema.users)
               .where(eq(schema.users.id, trimmed))
-              .get();
+              .limit(1);
             if (!pt || pt.role !== "pt") {
               return new Response(JSON.stringify({ error: "Assigned PT not found" }), {
                 status: 400,
@@ -162,7 +160,7 @@ export const Route = createFileRoute("/api/admin/users")({
         }
 
         try {
-          db.update(schema.users).set(patch).where(eq(schema.users.id, data.id)).run();
+          await db.update(schema.users).set(patch).where(eq(schema.users.id, data.id));
           return new Response(JSON.stringify({ ok: true }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

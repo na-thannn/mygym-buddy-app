@@ -6,7 +6,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -29,9 +29,7 @@ export const logWorkoutEntry = createServerFn({ method: "POST" })
     const { db, schema } = await import("@/server/db");
     const { newId } = await import("@/server/auth");
     const id = newId();
-    db.insert(schema.workoutLogs)
-      .values({ id, userId: session.userId, ...data })
-      .run();
+    await db.insert(schema.workoutLogs).values({ id, userId: session.userId, ...data });
     return { ok: true, id };
   });
 
@@ -51,11 +49,10 @@ export const listRecentWorkouts = createServerFn({ method: "GET" })
     const where = [eq(schema.workoutLogs.userId, session.userId)];
     if (data.fromDate) where.push(gte(schema.workoutLogs.performedAt, data.fromDate));
     if (data.toDate) where.push(lte(schema.workoutLogs.performedAt, data.toDate));
-    return db
+    return await db
       .select()
       .from(schema.workoutLogs)
       .where(and(...where))
       .orderBy(desc(schema.workoutLogs.performedAt), desc(schema.workoutLogs.createdAt))
-      .limit(data.limit)
-      .all();
+      .limit(data.limit);
   });

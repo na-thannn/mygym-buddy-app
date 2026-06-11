@@ -36,12 +36,12 @@ function hashSessionToken(token: string): string {
   return encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
 }
 
-export function createSession(userId: string): { token: string; expiresAt: number } {
+export async function createSession(userId: string): Promise<{ token: string; expiresAt: number }> {
   const token = generateSessionToken();
   const sessionId = hashSessionToken(token);
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   try {
-    db.insert(schema.sessions).values({ id: sessionId, userId, expiresAt }).run();
+    await db.insert(schema.sessions).values({ id: sessionId, userId, expiresAt });
     return { token, expiresAt };
   } catch (err) {
     logDevError({ error: err, req: null }).catch(() => {});
@@ -54,11 +54,12 @@ export type AuthSession = {
   email: string;
   displayName: string;
   role: AppRole;
+  mustChangePassword: boolean;
 };
 
-export function validateSessionToken(token: string): AuthSession | null {
+export async function validateSessionToken(token: string): Promise<AuthSession | null> {
   const sessionId = hashSessionToken(token);
-  const row = db
+  const [row] = await db
     .select({
       sessionId: schema.sessions.id,
       userId: schema.sessions.userId,
@@ -66,15 +67,16 @@ export function validateSessionToken(token: string): AuthSession | null {
       email: schema.users.email,
       displayName: schema.users.displayName,
       role: schema.users.role,
+      mustChangePassword: schema.users.mustChangePassword,
     })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
     .where(eq(schema.sessions.id, sessionId))
-    .get();
+    .limit(1);
   if (!row) return null;
   const now = Math.floor(Date.now() / 1000);
   if (row.expiresAt < now) {
-    db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId)).run();
+    await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
     return null;
   }
   return {
@@ -82,12 +84,13 @@ export function validateSessionToken(token: string): AuthSession | null {
     email: row.email,
     displayName: row.displayName,
     role: normalizeRole(row.role),
+    mustChangePassword: row.mustChangePassword === 1,
   };
 }
 
-export function invalidateSessionToken(token: string) {
+export async function invalidateSessionToken(token: string) {
   const sessionId = hashSessionToken(token);
-  db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId)).run();
+  await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
 }
 
 export function setSessionCookie(token: string, expiresAtSeconds: number) {
@@ -108,19 +111,19 @@ export function readSessionCookie(): string | undefined {
   return getCookie(SESSION_COOKIE);
 }
 
-export function getSessionUser(): AuthSession | null {
+export async function getSessionUser(): Promise<AuthSession | null> {
   const token = readSessionCookie();
   return token ? validateSessionToken(token) : null;
 }
 
-export function requireSessionUser(): AuthSession {
-  const session = getSessionUser();
+export async function requireSessionUser(): Promise<AuthSession> {
+  const session = await getSessionUser();
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
 
-export function requireRole(roles: readonly AppRole[]): AuthSession {
-  const session = requireSessionUser();
+export async function requireRole(roles: readonly AppRole[]): Promise<AuthSession> {
+  const session = await requireSessionUser();
   if (!hasAnyRole(session, roles)) throw new Response("Forbidden", { status: 403 });
   return session;
 }
@@ -129,7 +132,7 @@ export function requireRole(roles: readonly AppRole[]): AuthSession {
 export const requireAuth = createMiddleware({ type: "function" }).server(async ({ next }) => {
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return next({
     context: {

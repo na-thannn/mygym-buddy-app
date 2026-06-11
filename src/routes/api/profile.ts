@@ -11,13 +11,13 @@ export const Route = createFileRoute("/api/profile")({
     handlers: {
       GET: async () => {
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
-        const row = db
+        const [row] = await db
           .select()
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, session.userId))
-          .get();
+          .limit(1);
         return new Response(JSON.stringify(row ?? null), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/api/profile")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -35,25 +35,23 @@ export const Route = createFileRoute("/api/profile")({
           });
         const body: unknown = await parseRequestBody(request as unknown);
         const bodyObj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-        const existing = db
+        const [existing] = await db
           .select({ userId: schema.profiles.userId })
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, session.userId))
-          .get();
+          .limit(1);
         const patch = {
           ...(bodyObj as Record<string, unknown>),
           updatedAt: new Date().toISOString(),
         };
         try {
           if (existing) {
-            db.update(schema.profiles)
+            await db
+              .update(schema.profiles)
               .set(patch)
-              .where(eq(schema.profiles.userId, session.userId))
-              .run();
+              .where(eq(schema.profiles.userId, session.userId));
           } else {
-            db.insert(schema.profiles)
-              .values({ userId: session.userId, ...patch })
-              .run();
+            await db.insert(schema.profiles).values({ userId: session.userId, ...patch });
           }
           return new Response(JSON.stringify({ ok: true }), {
             status: 200,

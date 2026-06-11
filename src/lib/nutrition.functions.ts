@@ -9,7 +9,7 @@ async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
   const token = readSessionCookie();
   if (!token) throw new Response("Unauthorized", { status: 401 });
-  const session = validateSessionToken(token);
+  const session = await validateSessionToken(token);
   if (!session) throw new Response("Unauthorized", { status: 401 });
   return session;
 }
@@ -91,7 +91,8 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
     };
     const id = newId();
     try {
-      db.insert(schema.nutritionReports)
+      await db
+        .insert(schema.nutritionReports)
         .values({
           id,
           userId: session.userId,
@@ -108,8 +109,7 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
           proteinG: resolvedMacros.proteinG ?? null,
           carbsG: resolvedMacros.carbsG ?? null,
           fatsG: resolvedMacros.fatsG ?? null,
-        })
-        .run();
+        });
       const hasMacros = Object.values(resolvedMacros).some((v) => typeof v === "number");
       return { ok: true, id, macros: hasMacros ? resolvedMacros : null };
     } catch (err) {
@@ -121,11 +121,10 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
 export const listNutritionReports = createServerFn({ method: "GET" }).handler(async () => {
   const session = await requireSession();
   const { db, schema } = await import("@/server/db");
-  return db
+  return await db
     .select()
     .from(schema.nutritionReports)
     .where(eq(schema.nutritionReports.userId, session.userId))
     .orderBy(desc(schema.nutritionReports.reportDate))
-    .limit(50)
-    .all();
+    .limit(50);
 });

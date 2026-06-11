@@ -6,6 +6,7 @@ export type AppUser = {
   email: string;
   displayName: string;
   role: AppRole;
+  mustChangePassword: boolean;
 };
 
 interface AuthCtx {

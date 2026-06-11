@@ -9,7 +9,7 @@ export const Route = createFileRoute("/api/customers")({
   server: {
     handlers: {
       GET: async () => {
-        const session = getSessionUser();
+        const session = await getSessionUser();
         if (!session) return json({ error: "Unauthorized" }, 401);
 
         try {
@@ -18,11 +18,11 @@ export const Route = createFileRoute("/api/customers")({
             where.push(eq(schema.users.assignedPtId, session.userId));
           } else if (session.role === "customer") {
             where.push(eq(schema.users.id, session.userId));
-          } else if (!hasAnyRole(session, ["admin", "staff"])) {
+          } else if (!hasAnyRole(session, ["admin", "manager"])) {
             return json({ error: "Forbidden" }, 403);
           }
 
-          const customers = db
+          const customers = await db
             .select({
               id: schema.users.id,
               email: schema.users.email,
@@ -33,8 +33,7 @@ export const Route = createFileRoute("/api/customers")({
             .from(schema.users)
             .where(and(...where))
             .orderBy(desc(schema.users.createdAt))
-            .limit(500)
-            .all();
+            .limit(500);
           return json({
             customers: customers.map((customer) => ({
               ...customer,

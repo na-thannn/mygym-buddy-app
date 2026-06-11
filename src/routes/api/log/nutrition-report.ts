@@ -11,15 +11,14 @@ export const Route = createFileRoute("/api/log/nutrition-report")({
     handlers: {
       GET: async () => {
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session) return new Response(null, { status: 204 });
-        const rows = db
+        const rows = await db
           .select()
           .from(schema.nutritionReports)
           .where(eq(schema.nutritionReports.userId, session.userId))
           .orderBy(desc(schema.nutritionReports.reportDate))
-          .limit(50)
-          .all();
+          .limit(50);
         return new Response(JSON.stringify(rows), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -29,7 +28,7 @@ export const Route = createFileRoute("/api/log/nutrition-report")({
         const maybe = ctx as unknown as { request?: Request } & Record<string, unknown>;
         const request = maybe.request ?? (ctx as unknown as Request);
         const token = readSessionCookie();
-        const session = token ? validateSessionToken(token) : null;
+        const session = token ? await validateSessionToken(token) : null;
         if (!session)
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
@@ -114,7 +113,8 @@ export const Route = createFileRoute("/api/log/nutrition-report")({
 
         const id = newId();
         try {
-          db.insert(schema.nutritionReports)
+          await db
+            .insert(schema.nutritionReports)
             .values({
               id,
               userId: session.userId,
@@ -131,8 +131,7 @@ export const Route = createFileRoute("/api/log/nutrition-report")({
               proteinG: resolvedMacros.proteinG,
               carbsG: resolvedMacros.carbsG,
               fatsG: resolvedMacros.fatsG,
-            })
-            .run();
+            });
           const hasMacros = Object.values(resolvedMacros).some((v) => typeof v === "number");
           return new Response(
             JSON.stringify({ ok: true, id, macros: hasMacros ? resolvedMacros : null }),

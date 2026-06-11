@@ -27,7 +27,7 @@ import { AccessDenied } from "@/components/AccessDenied";
 import { ROLE_LABELS, type AppRole } from "@/lib/roles";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({ meta: [{ title: "Admin — HL Fitness" }] }),
+  head: () => ({ meta: [{ title: "Admin - HL Fitness" }] }),
   component: AdminPage,
 });
 
@@ -48,7 +48,7 @@ type PtOption = {
 
 type AdminStats = {
   totalUsers: number;
-  byRole: { admin: number; staff: number; pt: number; customer: number };
+  byRole: { admin: number; manager: number; pt: number; customer: number };
   unassignedCustomers: number;
   ptLoads: { id: string; displayName: string; email: string; assignedCount: number }[];
   bookingsByStatus: Record<string, number>;
@@ -161,6 +161,11 @@ function AdminPage() {
           />
           <StatCard label="PTs" value={stats.byRole.pt} icon={<BadgeCheck className="size-5" />} />
           <StatCard
+            label="Managers"
+            value={stats.byRole.manager}
+            icon={<Shield className="size-5" />}
+          />
+          <StatCard
             label="Unassigned"
             value={stats.unassignedCustomers}
             icon={<UserCog className="size-5" />}
@@ -192,15 +197,13 @@ function AdminPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
-        <div className="rounded-3xl border border-white/10 bg-black/40 backdrop-blur p-6">
+        <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-6">
           <div className="flex items-center justify-between gap-4 mb-4">
             <div>
-              <div className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                User management
-              </div>
+              <div className="text-xs text-slate-400">User management</div>
               <h2 className="text-lg font-semibold text-slate-100 mt-2">Roles and assignments</h2>
             </div>
-            <div className="size-10 rounded-2xl bg-white/5 border border-white/10 grid place-items-center text-slate-300">
+            <div className="size-10 rounded-2xl bg-white/[0.05] border border-white/10 grid place-items-center text-slate-300">
               <Shield className="size-5" />
             </div>
           </div>
@@ -221,16 +224,14 @@ function AdminPage() {
             {filteredUsers.map((u) => (
               <div
                 key={u.id}
-                className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3"
+                className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 flex flex-col gap-3"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="text-sm font-semibold text-slate-100">{u.displayName}</div>
                     <div className="text-xs text-slate-400">{u.email}</div>
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                    {ROLE_LABELS[u.role]}
-                  </div>
+                  <div className="text-[10px] text-slate-400">{ROLE_LABELS[u.role]}</div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-3">
@@ -288,7 +289,7 @@ function AdminPage() {
                       type="button"
                       onClick={() => saveUser(u)}
                       disabled={savingId === u.id}
-                      className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       {savingId === u.id ? (
                         <>
@@ -307,23 +308,26 @@ function AdminPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-black/40 backdrop-blur p-6">
+          <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">PT load</div>
+                <div className="text-xs text-slate-400">PT load</div>
                 <h2 className="text-lg font-semibold text-slate-100 mt-2">Client assignments</h2>
               </div>
-              <div className="size-10 rounded-2xl bg-white/5 border border-white/10 grid place-items-center text-slate-300">
+              <div className="size-10 rounded-2xl bg-white/[0.05] border border-white/10 grid place-items-center text-slate-300">
                 <UserCog className="size-5" />
               </div>
             </div>
             {stats?.ptLoads?.length ? (
               <div className="space-y-3">
                 {stats.ptLoads.map((pt) => (
-                  <div key={pt.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div
+                    key={pt.id}
+                    className="rounded-2xl border border-white/10 bg-white/[0.05] p-4"
+                  >
                     <div className="text-sm font-semibold text-slate-100">{pt.displayName}</div>
                     <div className="text-xs text-slate-400">{pt.email}</div>
-                    <div className="mt-2 text-xs text-yellow-200">
+                    <div className="mt-2 text-xs text-primary">
                       {pt.assignedCount} active clients
                     </div>
                   </div>
@@ -341,13 +345,13 @@ function AdminPage() {
 
 function StatCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-black/40 backdrop-blur p-4 sm:p-5">
+    <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-4 sm:p-5">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-xs uppercase tracking-[0.3em] text-slate-400">{label}</div>
+          <div className="text-xs text-slate-400">{label}</div>
           <div className="text-2xl font-semibold text-slate-100 mt-2">{value}</div>
         </div>
-        <div className="size-10 rounded-2xl bg-yellow-400/15 text-yellow-200 grid place-items-center">
+        <div className="size-10 rounded-2xl bg-primary/15 text-primary grid place-items-center">
           {icon}
         </div>
       </div>

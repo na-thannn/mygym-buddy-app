@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, Loader2, Users } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock, Loader2, Users } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/authContext";
+import { buildClassDiscovery, type ClassDiscoveryItem } from "@/lib/customer-experience";
 import { canManageGroupClasses } from "@/lib/group-classes";
 import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
@@ -52,7 +53,7 @@ function ClassesPage() {
   const [classes, setClasses] = useState<ClassDef[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,8 +75,12 @@ function ClassesPage() {
     load();
   }, [load]);
 
-  const submitAction = async (body: Record<string, unknown>, success: string) => {
-    setBusy(true);
+  const submitAction = async (
+    body: Record<string, unknown>,
+    success: string,
+    actionKey = String(body.action ?? "class-action"),
+  ) => {
+    setBusyKey(actionKey);
     try {
       const res = await fetch("/api/classes", {
         method: "POST",
@@ -90,7 +95,7 @@ function ClassesPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Action failed");
     } finally {
-      setBusy(false);
+      setBusyKey(null);
     }
   };
 
@@ -104,158 +109,385 @@ function ClassesPage() {
     return map;
   }, [enrollments]);
 
+  const discovery = useMemo(
+    () => buildClassDiscovery({ nowIso: new Date().toISOString(), sessions }),
+    [sessions],
+  );
+
   if (!user) return null;
   const canManage = canManageGroupClasses({ userId: user.id, role: user.role });
+  const adminBusy = Boolean(busyKey);
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-8 pb-24 md:pb-8">
+    <div className="mx-auto max-w-6xl p-4 pb-24 md:p-8">
       <PageHeader
         title="Group Classes"
-        subtitle="Book sessions, manage attendance, and create scheduled gym classes."
+        subtitle="Find upcoming sessions, see capacity, and keep booked classes easy to spot."
       />
 
-      {loading && <div className="text-sm text-slate-400">Loading classes...</div>}
-
       {user.role === "admin" && (
-        <div className="grid gap-4 lg:grid-cols-2 mb-6">
-          <CreateClassForm busy={busy} onSubmit={submitAction} />
-          <ScheduleClassForm busy={busy} classes={classes} onSubmit={submitAction} />
-        </div>
+        <details className="mb-6 rounded-2xl border border-white/10 bg-[#111612] p-5">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-100">
+            Admin class tools
+          </summary>
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <CreateClassForm busy={adminBusy} onSubmit={submitAction} />
+            <ScheduleClassForm busy={adminBusy} classes={classes} onSubmit={submitAction} />
+          </div>
+        </details>
       )}
 
-      {!loading && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {sessions.length === 0 && (
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-6 text-sm text-slate-400">
-              No group classes scheduled yet.
-            </div>
+      {loading ? (
+        <div className="rounded-2xl border border-white/10 bg-[#111612] p-6 text-sm text-slate-400">
+          <Loader2 className="mr-2 inline size-4 animate-spin" />
+          Loading classes
+        </div>
+      ) : sessions.length === 0 ? (
+        <EmptyState
+          title="No group classes scheduled"
+          detail="Check back after managers add sessions."
+        />
+      ) : user.role === "customer" ? (
+        <div className="space-y-8">
+          <ClassSection
+            title="Booked"
+            detail="Your upcoming class sessions."
+            sessions={discovery.bookedUpcoming}
+            busyKey={busyKey}
+            onAction={submitAction}
+            mode="booked"
+          />
+          <ClassSection
+            title="Discover classes"
+            detail="Available upcoming sessions sorted by start time."
+            sessions={discovery.availableUpcoming}
+            busyKey={busyKey}
+            onAction={submitAction}
+            mode="available"
+          />
+          {discovery.unavailable.length > 0 && (
+            <ClassSection
+              title="Full or unavailable"
+              detail="These sessions are visible but cannot be booked right now."
+              sessions={discovery.unavailable}
+              busyKey={busyKey}
+              onAction={submitAction}
+              mode="unavailable"
+            />
           )}
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {sessions.map((session) => (
+            <ManagedClassCard
+              key={session.sessionId}
+              session={session}
+              rows={enrollmentsBySession.get(session.sessionId) ?? []}
+              canManage={canManage}
+              busyKey={busyKey}
+              onAction={submitAction}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {sessions.map((session) => {
-            const rows = enrollmentsBySession.get(session.sessionId) ?? [];
-            const isBooked = session.myBooking?.status === "booked";
-            return (
-              <div
-                key={session.sessionId}
-                className="rounded-2xl border border-white/10 bg-black/40 p-5"
-              >
-                <div className="flex items-start justify-between gap-4">
+function ClassSection({
+  title,
+  detail,
+  sessions,
+  busyKey,
+  onAction,
+  mode,
+}: {
+  title: string;
+  detail: string;
+  sessions: ClassDiscoveryItem[];
+  busyKey: string | null;
+  onAction: (body: Record<string, unknown>, success: string, actionKey?: string) => Promise<void>;
+  mode: "booked" | "available" | "unavailable";
+}) {
+  return (
+    <section>
+      <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-slate-100">{title}</h2>
+          <p className="mt-1 text-sm text-slate-400">{detail}</p>
+        </div>
+        <span className="text-xs text-slate-500">
+          {sessions.length} session{sessions.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      {sessions.length === 0 ? (
+        <EmptyState
+          title={mode === "booked" ? "No booked classes" : "No sessions in this group"}
+          detail={
+            mode === "booked"
+              ? "Book a class below and it will stay pinned here."
+              : "Try another day or check back when managers publish more sessions."
+          }
+          compact
+        />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {sessions.map((session) => (
+            <CustomerClassCard
+              key={session.sessionId}
+              session={session}
+              busyKey={busyKey}
+              onAction={onAction}
+              mode={mode}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CustomerClassCard({
+  session,
+  busyKey,
+  onAction,
+  mode,
+}: {
+  session: ClassDiscoveryItem;
+  busyKey: string | null;
+  onAction: (body: Record<string, unknown>, success: string, actionKey?: string) => Promise<void>;
+  mode: "booked" | "available" | "unavailable";
+}) {
+  const bookKey = `book-${session.sessionId}`;
+  const cancelKey = `cancel-${session.myBooking?.id ?? session.sessionId}`;
+  const actionBusy = busyKey === bookKey || busyKey === cancelKey;
+
+  return (
+    <article className="rounded-2xl border border-white/10 bg-[#111612] p-5 shadow-[0_25px_60px_-55px_rgba(0,0,0,0.8)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold text-slate-100">{session.title}</h3>
+            {session.isBooked && (
+              <span className="rounded-full bg-emerald-400/15 px-2 py-1 text-[11px] text-emerald-200">
+                Booked
+              </span>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-300">
+            <Chip icon={CalendarDays}>{formatDate(session.startsAt)}</Chip>
+            <Chip icon={Clock}>{session.durationMinutes} min</Chip>
+            {session.level && <Chip>{session.level}</Chip>}
+          </div>
+        </div>
+        <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary">
+          <CalendarDays className="size-5" />
+        </div>
+      </div>
+
+      {session.description && (
+        <p className="mt-4 text-sm leading-6 text-slate-300">{session.description}</p>
+      )}
+
+      <CapacityMeter session={session} />
+
+      <div className="mt-5">
+        {mode === "booked" ? (
+          <Button
+            variant="outline"
+            disabled={actionBusy}
+            className="w-full border-white/10 text-slate-200 hover:text-primary"
+            onClick={() =>
+              onAction(
+                { action: "cancel-booking", bookingId: session.myBooking?.id },
+                "Class booking cancelled",
+                cancelKey,
+              )
+            }
+          >
+            {actionBusy && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Cancel booking
+          </Button>
+        ) : mode === "available" ? (
+          <Button
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+            disabled={actionBusy || session.seatsLeft <= 0}
+            onClick={() =>
+              onAction(
+                { action: "book-session", sessionId: session.sessionId },
+                "Class booked",
+                bookKey,
+              )
+            }
+          >
+            {actionBusy && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Book class
+          </Button>
+        ) : (
+          <Button variant="outline" disabled className="w-full">
+            {session.capacityLabel}
+          </Button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function ManagedClassCard({
+  session,
+  rows,
+  canManage,
+  busyKey,
+  onAction,
+}: {
+  session: ClassSession;
+  rows: Enrollment[];
+  canManage: boolean;
+  busyKey: string | null;
+  onAction: (body: Record<string, unknown>, success: string, actionKey?: string) => Promise<void>;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#111612] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-lg font-semibold text-slate-100">{session.title}</div>
+          <div className="mt-1 text-sm text-slate-400">{formatDate(session.startsAt)}</div>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-300">
+            <span className="rounded-full bg-white/10 px-2 py-1">
+              {session.durationMinutes} min
+            </span>
+            <span className="rounded-full bg-white/10 px-2 py-1">
+              {session.seatsLeft} / {session.capacity} seats left
+            </span>
+            {session.level && (
+              <span className="rounded-full bg-primary/15 px-2 py-1 text-primary">
+                {session.level}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="grid size-10 place-items-center rounded-2xl bg-primary/15 text-primary">
+          <CalendarDays className="size-5" />
+        </div>
+      </div>
+
+      {session.description && <p className="mt-3 text-sm text-slate-300">{session.description}</p>}
+
+      {canManage && rows.length > 0 && (
+        <div className="mt-5 border-t border-white/10 pt-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-100">
+            <Users className="size-4" />
+            Attendance
+          </div>
+          <div className="space-y-2">
+            {rows.map((row) => {
+              const presentKey = `present-${row.id}`;
+              const noShowKey = `noshow-${row.id}`;
+              return (
+                <div
+                  key={row.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/[0.05] p-3"
+                >
                   <div>
-                    <div className="text-lg font-semibold text-slate-100">{session.title}</div>
-                    <div className="mt-1 text-sm text-slate-400">
-                      {formatDate(session.startsAt)}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-300">
-                      <span className="rounded-full bg-white/10 px-2 py-1">
-                        {session.durationMinutes} min
-                      </span>
-                      <span className="rounded-full bg-white/10 px-2 py-1">
-                        {session.seatsLeft} / {session.capacity} seats left
-                      </span>
-                      {session.level && (
-                        <span className="rounded-full bg-yellow-400/15 px-2 py-1 text-yellow-200">
-                          {session.level}
-                        </span>
-                      )}
-                    </div>
+                    <div className="text-sm text-slate-100">{row.customerName}</div>
+                    <div className="text-xs text-slate-400">{row.customerEmail}</div>
                   </div>
-                  <div className="grid size-10 place-items-center rounded-2xl bg-yellow-400/15 text-yellow-200">
-                    <CalendarDays className="size-5" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">{row.status}</span>
+                    <Button
+                      size="sm"
+                      disabled={busyKey === presentKey}
+                      onClick={() =>
+                        onAction(
+                          { action: "mark-attendance", bookingId: row.id, attended: true },
+                          "Attendance marked",
+                          presentKey,
+                        )
+                      }
+                    >
+                      {busyKey === presentKey && <Loader2 className="mr-2 size-4 animate-spin" />}
+                      Present
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busyKey === noShowKey}
+                      onClick={() =>
+                        onAction(
+                          { action: "mark-attendance", bookingId: row.id, attended: false },
+                          "No-show marked",
+                          noShowKey,
+                        )
+                      }
+                    >
+                      No-show
+                    </Button>
                   </div>
                 </div>
-
-                {session.description && (
-                  <p className="mt-3 text-sm text-slate-300">{session.description}</p>
-                )}
-
-                {user.role === "customer" && (
-                  <div className="mt-4">
-                    {isBooked ? (
-                      <Button
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() =>
-                          submitAction(
-                            { action: "cancel-booking", bookingId: session.myBooking?.id },
-                            "Class booking cancelled",
-                          )
-                        }
-                      >
-                        Cancel booking
-                      </Button>
-                    ) : (
-                      <Button
-                        className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
-                        disabled={busy || session.seatsLeft <= 0}
-                        onClick={() =>
-                          submitAction(
-                            { action: "book-session", sessionId: session.sessionId },
-                            "Class booked",
-                          )
-                        }
-                      >
-                        {session.seatsLeft <= 0 ? "Full" : "Book class"}
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {canManage && rows.length > 0 && (
-                  <div className="mt-5 border-t border-white/10 pt-4">
-                    <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-100">
-                      <Users className="size-4" />
-                      Attendance
-                    </div>
-                    <div className="space-y-2">
-                      {rows.map((row) => (
-                        <div
-                          key={row.id}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 p-3"
-                        >
-                          <div>
-                            <div className="text-sm text-slate-100">{row.customerName}</div>
-                            <div className="text-xs text-slate-400">{row.customerEmail}</div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                              {row.status}
-                            </span>
-                            <Button
-                              size="sm"
-                              disabled={busy}
-                              onClick={() =>
-                                submitAction(
-                                  { action: "mark-attendance", bookingId: row.id, attended: true },
-                                  "Attendance marked",
-                                )
-                              }
-                            >
-                              Present
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() =>
-                                submitAction(
-                                  { action: "mark-attendance", bookingId: row.id, attended: false },
-                                  "No-show marked",
-                                )
-                              }
-                            >
-                              No-show
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CapacityMeter({ session }: { session: ClassDiscoveryItem }) {
+  const tone =
+    session.capacityTone === "booked"
+      ? "bg-emerald-300"
+      : session.capacityTone === "full"
+        ? "bg-rose-300"
+        : session.capacityTone === "tight"
+          ? "bg-amber-300"
+          : "bg-primary";
+  return (
+    <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+        <span className="text-slate-400">Capacity</span>
+        <span className="font-medium text-slate-100">{session.capacityLabel}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className={`h-full rounded-full ${tone}`}
+          style={{ width: `${session.capacityPercent}%` }}
+        />
+      </div>
+      <div className="mt-2 text-[11px] text-slate-500">
+        {session.bookedCount} booked out of {session.capacity}
+      </div>
+    </div>
+  );
+}
+
+function Chip({ icon: Icon, children }: { icon?: typeof CalendarDays; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1">
+      {Icon && <Icon className="size-3.5" />}
+      {children}
+    </span>
+  );
+}
+
+function EmptyState({
+  title,
+  detail,
+  compact = false,
+}: {
+  title: string;
+  detail: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border border-dashed border-white/10 bg-[#111612] text-center ${
+        compact ? "p-5" : "p-8"
+      }`}
+    >
+      <CheckCircle2 className="mx-auto mb-3 size-6 text-slate-500" />
+      <div className="text-sm font-medium text-slate-100">{title}</div>
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-400">{detail}</p>
     </div>
   );
 }
@@ -265,11 +497,11 @@ function CreateClassForm({
   onSubmit,
 }: {
   busy: boolean;
-  onSubmit: (body: Record<string, unknown>, success: string) => Promise<void>;
+  onSubmit: (body: Record<string, unknown>, success: string, actionKey?: string) => Promise<void>;
 }) {
   return (
     <form
-      className="rounded-2xl border border-white/10 bg-black/40 p-5"
+      className="rounded-2xl border border-white/10 bg-white/[0.04] p-5"
       onSubmit={async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -281,25 +513,23 @@ function CreateClassForm({
             level: String(fd.get("level") ?? ""),
           },
           "Class created",
+          "create-class",
         );
         e.currentTarget.reset();
       }}
     >
       <h2 className="mb-4 text-lg font-semibold text-slate-100">Create class</h2>
       <div className="grid gap-3">
-        <div className="space-y-1">
-          <Label>Name</Label>
+        <Field label="Name">
           <Input name="title" required placeholder="Strength Foundations" />
-        </div>
-        <div className="space-y-1">
-          <Label>Level</Label>
+        </Field>
+        <Field label="Level">
           <Input name="level" placeholder="Beginner" />
-        </div>
-        <div className="space-y-1">
-          <Label>Description</Label>
+        </Field>
+        <Field label="Description">
           <Textarea name="description" rows={3} />
-        </div>
-        <Button disabled={busy} className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
+        </Field>
+        <Button disabled={busy} className="bg-primary text-primary-foreground hover:bg-primary/90">
           {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
           Create
         </Button>
@@ -315,11 +545,11 @@ function ScheduleClassForm({
 }: {
   busy: boolean;
   classes: ClassDef[];
-  onSubmit: (body: Record<string, unknown>, success: string) => Promise<void>;
+  onSubmit: (body: Record<string, unknown>, success: string, actionKey?: string) => Promise<void>;
 }) {
   return (
     <form
-      className="rounded-2xl border border-white/10 bg-black/40 p-5"
+      className="rounded-2xl border border-white/10 bg-white/[0.04] p-5"
       onSubmit={async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -332,6 +562,7 @@ function ScheduleClassForm({
             capacity: Number(fd.get("capacity") ?? 12),
           },
           "Class session scheduled",
+          "schedule-session",
         );
         e.currentTarget.reset();
       }}
@@ -341,8 +572,7 @@ function ScheduleClassForm({
         <div className="text-sm text-slate-400">Create a class before scheduling sessions.</div>
       ) : (
         <div className="grid gap-3">
-          <div className="space-y-1">
-            <Label>Class</Label>
+          <Field label="Class">
             <select
               name="classId"
               required
@@ -354,27 +584,36 @@ function ScheduleClassForm({
                 </option>
               ))}
             </select>
-          </div>
+          </Field>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1 sm:col-span-1">
-              <Label>Date & time</Label>
+            <Field label="Date & time">
               <Input name="startsAt" type="datetime-local" required />
-            </div>
-            <div className="space-y-1">
-              <Label>Duration</Label>
+            </Field>
+            <Field label="Duration">
               <Input name="durationMinutes" type="number" defaultValue={60} min={15} max={240} />
-            </div>
-            <div className="space-y-1">
-              <Label>Capacity</Label>
+            </Field>
+            <Field label="Capacity">
               <Input name="capacity" type="number" defaultValue={12} min={1} max={100} />
-            </div>
+            </Field>
           </div>
-          <Button disabled={busy} className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300">
+          <Button
+            disabled={busy}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
             {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
             Schedule
           </Button>
         </div>
       )}
     </form>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <Label>{label}</Label>
+      {children}
+    </div>
   );
 }

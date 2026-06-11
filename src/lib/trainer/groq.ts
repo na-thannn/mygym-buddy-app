@@ -11,6 +11,6 @@ export function getGroq() {
 }
 
 // Llama 3.3 70B Versatile — Groq's flagship free-tier model, strong tool calling.
-export const ALEX_MODEL_ID = "llama-3.3-70b-versatile";
+export const ALEX_MODEL_ID = process.env.ALEX_MODEL_ID ?? "llama-3.3-70b-versatile";
 // Smaller/faster for quick utility calls (macro estimation).
-export const FAST_MODEL_ID = "llama-3.1-8b-instant";
+export const FAST_MODEL_ID = process.env.ALEX_FAST_MODEL_ID ?? "llama-3.1-8b-instant";

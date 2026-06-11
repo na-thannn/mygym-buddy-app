@@ -10,17 +10,16 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-end justify-between gap-3 mb-6 animate-fade-up">
-      <div>
-        <div className="text-[11px] uppercase tracking-[0.35em] text-yellow-300 mb-2">
-          Dashboard
-        </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-100">{title}</h1>
+    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight text-stone-50 md:text-3xl">{title}</h1>
         {(subtitle ?? description) && (
-          <p className="text-sm text-slate-300 mt-2 max-w-2xl">{subtitle ?? description}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-300">
+            {subtitle ?? description}
+          </p>
         )}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }

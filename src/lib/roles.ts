@@ -1,4 +1,4 @@
-export const APP_ROLES = ["admin", "staff", "pt", "customer"] as const;
+export const APP_ROLES = ["admin", "manager", "pt", "customer"] as const;
 
 export type AppRole = (typeof APP_ROLES)[number];
 
@@ -21,7 +21,7 @@ export type CustomerSubject = {
 
 export type SupportTicketSubject = {
   customerId: string;
-  assignedStaffId?: string | null;
+  assignedManagerId?: string | null;
   assignedPtId?: string | null;
 };
 
@@ -29,7 +29,7 @@ export type SupportTicketAction = "view" | "triage" | "resolve";
 
 export const ROLE_LABELS: Record<AppRole, string> = {
   admin: "Admin",
-  staff: "Staff",
+  manager: "Manager",
   pt: "PT",
   customer: "Customer",
 };
@@ -64,7 +64,7 @@ export function canManageBooking(
   action: BookingAction,
 ): boolean {
   if (!actor || !isAppRole(actor.role)) return false;
-  if (actor.role === "admin" || actor.role === "staff") return true;
+  if (actor.role === "admin" || actor.role === "manager") return true;
 
   const isOwningCustomer = actor.role === "customer" && booking.customerId === actor.userId;
   const isAssignedPt = actor.role === "pt" && booking.ptId === actor.userId;
@@ -92,7 +92,7 @@ export function canManageSupportTicket(
   action: SupportTicketAction,
 ): boolean {
   if (!actor || !isAppRole(actor.role)) return false;
-  if (actor.role === "admin" || actor.role === "staff") return true;
+  if (actor.role === "admin" || actor.role === "manager") return true;
   if (actor.role === "pt") return ticket.assignedPtId === actor.userId;
   if (actor.role === "customer") return action === "view" && ticket.customerId === actor.userId;
   return false;
