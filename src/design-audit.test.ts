@@ -89,6 +89,15 @@ describe("frontend redesign audit", () => {
     expect(landing).not.toContain("href={item.href}");
   });
 
+  test("landing hero does not render legacy proof cards before public content loads", () => {
+    const landing = readFileSync(join(ROOT, "src/routes/index.tsx"), "utf8");
+
+    expect(landing).not.toContain("const proof = [");
+    expect(landing).not.toContain(": proof");
+    expect(landing).not.toContain('title: "Location"');
+    expect(landing).not.toContain('title: "Member loop"');
+  });
+
   test("public funnel uses kinetic hover surfaces instead of yellow spotlight and magnetic CTAs", () => {
     const styles = readFileSync(join(ROOT, "src/styles.css"), "utf8");
     const landing = readFileSync(join(ROOT, "src/routes/index.tsx"), "utf8");

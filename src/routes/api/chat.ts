@@ -40,7 +40,7 @@ export async function handleChatPost(request: Request) {
   const thread = await loadChatThread({ userId: session.userId, threadId });
   if (!thread) return json({ error: "Chat thread not found" }, 404);
 
-  const tools = buildAlexTools(session.userId);
+  const tools = buildAlexTools({ userId: session.userId, role: session.role });
   const aiTools = tools as unknown as AiTools;
   let validatedMessages: UIMessage[];
   try {

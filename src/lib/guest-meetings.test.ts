@@ -33,7 +33,7 @@ describe("guest meeting helpers", () => {
       pts,
       existingBookings: [],
       existingGuestMeetings: [],
-      unavailableDays: [],
+      unavailabilityBlocks: [],
     });
 
     expect(result).toEqual({ assignedPtId: "pt-b", usedFallback: false });
@@ -46,10 +46,43 @@ describe("guest meeting helpers", () => {
       pts,
       existingBookings: [],
       existingGuestMeetings: [],
-      unavailableDays: [{ ptId: "pt-b", unavailableDate: "2026-06-02" }],
+      unavailabilityBlocks: [
+        {
+          id: "pt-b-off",
+          ptId: "pt-b",
+          unavailableDate: "2026-06-02",
+          allDay: true,
+          startTime: null,
+          endTime: null,
+          reason: null,
+        },
+      ],
     });
 
     expect(result).toEqual({ assignedPtId: "pt-a", usedFallback: true });
+  });
+
+  it("treats a PT as unavailable only for overlapping partial-day blocks", () => {
+    const result = selectPtForGuestMeeting({
+      requestedPtId: "pt-b",
+      scheduledAt: "2026-06-02T07:00:00.000Z",
+      pts,
+      existingBookings: [],
+      existingGuestMeetings: [],
+      unavailabilityBlocks: [
+        {
+          id: "pt-b-morning",
+          ptId: "pt-b",
+          unavailableDate: "2026-06-02",
+          allDay: false,
+          startTime: "09:00",
+          endTime: "12:00",
+          reason: null,
+        },
+      ],
+    });
+
+    expect(result).toEqual({ assignedPtId: "pt-b", usedFallback: false });
   });
 
   it("returns null when every PT is unavailable for the requested slot", () => {
@@ -62,7 +95,7 @@ describe("guest meeting helpers", () => {
         { assignedPtId: "pt-b", scheduledAt, status: "confirmed" },
         { assignedPtId: "pt-c", scheduledAt, status: "completed" },
       ],
-      unavailableDays: [],
+      unavailabilityBlocks: [],
     });
 
     expect(result).toBeNull();

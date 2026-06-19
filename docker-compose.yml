@@ -17,5 +17,31 @@ services:
       timeout: 5s
       retries: 10
 
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: hl-fitness-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Override the localhost URL from .env so the app reaches the postgres service.
+      DATABASE_URL: postgres://hlfitness:hlfitness@postgres:5432/hlfitness
+      # Polling-based file watching for HMR across the host bind mount.
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
+      # More libuv I/O threads so file reads aren't starved by the poller.
+      UV_THREADPOOL_SIZE: "16"
+    ports:
+      - "5173:5173"
+    volumes:
+      # Bind-mount source for live edits; anonymous volume keeps container node_modules.
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+
 volumes:
   hl_fitness_postgres:

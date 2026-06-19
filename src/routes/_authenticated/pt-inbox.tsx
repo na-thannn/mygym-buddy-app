@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { CalendarOff, ClipboardList, Dumbbell, Headphones, UserPlus } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ClipboardList, Dumbbell, Headphones, UserPlus } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { AccessDenied } from "@/components/AccessDenied";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  PtAvailabilityCalendar,
+  type PtAvailabilityBlock,
+} from "@/components/PtAvailabilityCalendar";
 import { useAuth } from "@/lib/authContext";
 import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
@@ -52,14 +56,10 @@ type GuestMeeting = {
   scheduledAt: string;
   usedFallback: number;
   status: string;
+  meetingType?: string | null;
+  onlineMeetingUrl?: string | null;
+  zaloUserId?: string | null;
   createdUserId?: string | null;
-};
-
-type UnavailableDay = {
-  id: string;
-  ptId: string;
-  unavailableDate: string;
-  reason?: string | null;
 };
 
 type ServiceOffering = {
@@ -69,30 +69,20 @@ type ServiceOffering = {
   priceVnd: number;
 };
 
-type ImportPreviewRow = {
-  unavailableDate: string;
-  reason: string | null;
-  valid: boolean;
-  duplicate: boolean;
-  errors: string[];
-};
-
 function PtDesk() {
   const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [guestMeetings, setGuestMeetings] = useState<GuestMeeting[]>([]);
-  const [unavailableDays, setUnavailableDays] = useState<UnavailableDay[]>([]);
+  const [availabilityBlocks, setAvailabilityBlocks] = useState<PtAvailabilityBlock[]>([]);
   const [services, setServices] = useState<ServiceOffering[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [ptBio, setPtBio] = useState("");
   const [ptSpecialties, setPtSpecialties] = useState("");
-  const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
-  const [importFileBase64, setImportFileBase64] = useState("");
-  const [unavailableDate, setUnavailableDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,7 +93,7 @@ function PtDesk() {
           fetch("/api/support", { credentials: "include" }),
           fetch("/api/customers", { credentials: "include" }),
           fetch("/api/guest-meetings", { credentials: "include" }),
-          fetch("/api/pt-unavailable-days", { credentials: "include" }),
+          fetch("/api/pt-unavailability-blocks", { credentials: "include" }),
           fetch("/api/pt/services", { credentials: "include" }),
         ]);
       if (
@@ -120,7 +110,7 @@ function PtDesk() {
       setTickets((await supportRes.json()).tickets ?? []);
       setCustomers((await customerRes.json()).customers ?? []);
       setGuestMeetings((await guestRes.json()).meetings ?? []);
-      setUnavailableDays((await unavailableRes.json()).days ?? []);
+      setAvailabilityBlocks((await unavailableRes.json()).blocks ?? []);
       const servicePayload = await serviceRes.json();
       setServices(servicePayload.services ?? []);
       setSelectedServiceIds(
@@ -182,49 +172,6 @@ function PtDesk() {
     }
   };
 
-  const addUnavailableDay = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!unavailableDate) return;
-    setBusy(true);
-    try {
-      const res = await fetch("/api/pt-unavailable-days", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ unavailableDate }),
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.error ?? "Unable to save unavailable day");
-      setUnavailableDate("");
-      toast.success("Unavailable day saved");
-      await load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Unable to save unavailable day");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeUnavailableDay = async (id: string) => {
-    setBusy(true);
-    try {
-      const res = await fetch("/api/pt-unavailable-days", {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.error ?? "Unable to remove unavailable day");
-      toast.success("Unavailable day removed");
-      await load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Unable to remove unavailable day");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const savePtServices = async () => {
     setBusy(true);
     try {
@@ -251,43 +198,6 @@ function PtDesk() {
     } finally {
       setBusy(false);
     }
-  };
-
-  const previewUnavailableImport = async (file: File | null) => {
-    if (!file) return;
-    const base64 = await fileToBase64(file);
-    setImportFileBase64(base64);
-    const res = await fetch("/api/pt-unavailable-days/import-preview", {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ fileBase64: base64 }),
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(payload?.error ?? "Unable to preview Excel file");
-      return;
-    }
-    setImportPreview(payload.preview ?? []);
-  };
-
-  const confirmUnavailableImport = async () => {
-    if (!importFileBase64) return;
-    const res = await fetch("/api/pt-unavailable-days/import-preview", {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ fileBase64: importFileBase64, confirm: true }),
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(payload?.error ?? "Unable to import Excel file");
-      return;
-    }
-    toast.success(`Imported ${payload.imported ?? 0} unavailable days`);
-    setImportPreview([]);
-    setImportFileBase64("");
-    await load();
   };
 
   if (!user || !["admin", "pt"].includes(user.role)) {
@@ -454,79 +364,91 @@ function PtDesk() {
                         <span className="rounded-lg bg-white/[0.06] px-2 py-1 text-slate-300">
                           {meeting.experience}
                         </span>
+                        <span
+                          className={`rounded-lg px-2 py-1 ${
+                            meeting.meetingType === "online"
+                              ? "bg-primary/15 text-primary"
+                              : "bg-white/[0.06] text-slate-300"
+                          }`}
+                        >
+                          {meeting.meetingType === "online" ? "Online" : "In person"}
+                        </span>
                         {meeting.usedFallback === 1 && (
                           <span className="rounded-lg bg-primary/15 px-2 py-1 text-primary">
                             Fallback assignment
                           </span>
                         )}
                       </div>
+                      {meeting.meetingType === "online" && (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              value={linkDrafts[meeting.id] ?? meeting.onlineMeetingUrl ?? ""}
+                              onChange={(e) =>
+                                setLinkDrafts((prev) => ({ ...prev, [meeting.id]: e.target.value }))
+                              }
+                              placeholder="https://meet.jit.si/..."
+                              className="h-9 min-w-[220px] flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                busy || !(linkDrafts[meeting.id] ?? meeting.onlineMeetingUrl)
+                              }
+                              onClick={() =>
+                                guestAction(
+                                  {
+                                    id: meeting.id,
+                                    action: "set-link",
+                                    onlineMeetingUrl:
+                                      linkDrafts[meeting.id] ?? meeting.onlineMeetingUrl,
+                                  },
+                                  "Meeting link saved",
+                                )
+                              }
+                            >
+                              Save link
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                guestAction(
+                                  { id: meeting.id, action: "send-zalo" },
+                                  "Zalo message sent",
+                                )
+                              }
+                            >
+                              Send via Zalo
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                guestAction({ id: meeting.id, action: "remind" }, "Reminder sent")
+                              }
+                            >
+                              Send reminder
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-[#111612] p-5">
-              <h2 className="mb-4 text-lg font-semibold text-slate-100">Unavailable days</h2>
-              <form onSubmit={addUnavailableDay} className="flex gap-2">
-                <Input
-                  type="date"
-                  value={unavailableDate}
-                  onChange={(e) => setUnavailableDate(e.target.value)}
-                  className="h-10"
-                />
-                <Button type="submit" disabled={busy || !unavailableDate} size="sm">
-                  <CalendarOff className="mr-2 size-4" strokeWidth={1.8} />
-                  Add
-                </Button>
-              </form>
-              <div className="mt-4 rounded-xl bg-white/[0.05] p-3">
-                <div className="mb-2 text-sm font-medium text-slate-100">Excel import</div>
-                <Input
-                  type="file"
-                  accept=".xlsx"
-                  onChange={(event) => previewUnavailableImport(event.target.files?.[0] ?? null)}
-                />
-                {importPreview.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    <div className="text-xs text-slate-400">
-                      {importPreview.filter((row) => row.valid && !row.duplicate).length} ready /{" "}
-                      {importPreview.filter((row) => row.duplicate).length} duplicates
-                    </div>
-                    {importPreview.slice(0, 5).map((row, index) => (
-                      <div key={`${row.unavailableDate}-${index}`} className="text-xs text-slate-300">
-                        {row.unavailableDate} -{" "}
-                        {row.valid ? (row.duplicate ? "duplicate" : "ready") : row.errors.join(", ")}
-                      </div>
-                    ))}
-                    <Button size="sm" disabled={busy} onClick={confirmUnavailableImport}>
-                      Confirm import
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <div className="mt-4 space-y-2">
-                {unavailableDays.length === 0 && (
-                  <div className="text-sm text-slate-400">No unavailable days set.</div>
-                )}
-                {unavailableDays.slice(0, 8).map((day) => (
-                  <div
-                    key={day.id}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.05] px-3 py-2"
-                  >
-                    <div className="text-sm text-slate-200">{day.unavailableDate}</div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => removeUnavailableDay(day.id)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </section>
+            <PtAvailabilityCalendar
+              title="Unavailable time"
+              blocks={availabilityBlocks}
+              onRefresh={load}
+            />
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,1fr]">
@@ -666,16 +588,4 @@ function Metric({ label, value, icon }: { label: string; value: number; icon: Re
       </div>
     </div>
   );
-}
-
-function fileToBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const value = String(reader.result ?? "");
-      resolve(value.includes(",") ? value.split(",").pop() ?? "" : value);
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Unable to read file"));
-    reader.readAsDataURL(file);
-  });
 }

@@ -108,25 +108,6 @@ const steps = [
   },
 ];
 
-const proof = [
-  {
-    title: "Location",
-    detail: "303 Le Thanh Nghi",
-  },
-  {
-    title: "Member loop",
-    detail: "Workouts, InBody, nutrition, and coach feedback stay connected.",
-  },
-  {
-    title: "AI Coach",
-    detail: "Ask for plan feedback and weekly guidance when you need it.",
-  },
-  {
-    title: "Trainer context",
-    detail: "Coaches can review the same history before they respond.",
-  },
-];
-
 const heroLinks = [
   {
     href: "#member-loop",
@@ -201,6 +182,7 @@ type PublicPt = {
   specialtiesEn?: string | null;
   specialtiesVi?: string | null;
   photoPath?: string | null;
+  photoBase64?: string | null;
   yearsExperience?: number | null;
 };
 
@@ -286,13 +268,21 @@ function Landing() {
   const galleryProgress = galleryTotal > 0 ? ((gallerySelected + 1) / galleryTotal) * 100 : 0;
   const heroAddress = branch ? text(branch.addressEn, branch.addressVi) : "303 Le Thanh Nghi";
   const heroPhoto = "/photos/641295305_122181929684764018_5237898920015775179_n.jpg";
+  const heroSignals = plans.slice(0, 4).map((plan) => ({
+    title: text(plan.nameEn, plan.nameVi),
+    detail: `${formatVnd(plan.priceVnd)} / ${plan.durationDays} days`,
+  }));
 
   return (
     <div className="min-h-[100dvh] bg-[#080b0a] text-stone-50 dark">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#080b0a]/90">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:h-[72px] lg:px-8">
           <Link to="/" className="flex min-w-0 items-center gap-3">
-            <img src="/logo.jpg" alt="Logo" className="size-12 rounded-lg object-cover lg:size-14" />
+            <img
+              src="/logo.jpg"
+              alt="Logo"
+              className="size-12 rounded-lg object-cover lg:size-14"
+            />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold tracking-tight text-stone-50">
                 HL Fitness
@@ -388,25 +378,21 @@ function Landing() {
                 </Button>
               </div>
 
-              <div className="hero-signal-strip mt-5 grid max-w-5xl gap-2.5 animate-fade-up stagger-3 sm:grid-cols-2 lg:grid-cols-4">
-                {(plans.length
-                  ? plans.slice(0, 4).map((plan) => ({
-                      title: text(plan.nameEn, plan.nameVi),
-                      detail: `${formatVnd(plan.priceVnd)} / ${plan.durationDays} days`,
-                    }))
-                  : proof
-                ).map((item) => (
-                  <div
-                    key={item.title}
-                    className="min-h-[84px] rounded-xl border border-white/10 bg-[#080b0a]/62 p-3 backdrop-blur"
-                  >
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                      {item.title}
+              {heroSignals.length > 0 && (
+                <div className="hero-signal-strip mt-5 grid max-w-5xl gap-2.5 animate-fade-up stagger-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {heroSignals.map((item) => (
+                    <div
+                      key={item.title}
+                      className="min-h-[84px] rounded-xl border border-white/10 bg-[#080b0a]/62 p-3 backdrop-blur"
+                    >
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                        {item.title}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-stone-300">{item.detail}</div>
                     </div>
-                    <div className="mt-2 text-xs leading-5 text-stone-300">{item.detail}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <div className="hero-action-rail mt-3 flex max-w-5xl flex-wrap gap-2 animate-fade-up stagger-4">
                 {heroLinks.map((item) => (
@@ -865,7 +851,11 @@ function Landing() {
                       <div className="absolute inset-[-12px] rounded-full border border-primary/20 bg-primary/5 animate-pulse" />
                       <Avatar className="size-24 mb-5 border-2 border-primary/40 relative z-10">
                         <AvatarImage
-                          src={`https://api.dicebear.com/7.x/notionists/svg?seed=${pt.displayName.replace(/ /g, "")}`}
+                          src={
+                            pt.photoBase64 ||
+                            pt.photoPath ||
+                            `https://api.dicebear.com/7.x/notionists/svg?seed=${pt.displayName.replace(/ /g, "")}`
+                          }
                           alt={pt.displayName}
                         />
                         <AvatarFallback className="bg-[#111612] text-primary">
@@ -967,7 +957,11 @@ function Landing() {
                     >
                       <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.04)_0%,rgba(0,0,0,0.38)_100%)] transition duration-500 group-hover:opacity-50" />
                       <img
-                        src={photo.startsWith("/") ? photo : `/photos/${photo}`}
+                        src={
+                          photo.startsWith("/") || photo.startsWith("data:")
+                            ? photo
+                            : `/photos/${photo}`
+                        }
                         alt={`HL Fitness facility view ${i + 1}`}
                         className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.045]"
                       />

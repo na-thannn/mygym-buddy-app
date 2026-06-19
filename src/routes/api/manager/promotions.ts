@@ -9,7 +9,7 @@ import { newId } from "@/server/auth";
 const promotionSchema = z.object({
   id: z.string().optional(),
   titleEn: z.string().trim().min(1).max(140),
-  titleVi: z.string().trim().min(1).max(140),
+  titleVi: z.string().trim().min(1).max(140).optional(),
   bodyEn: z.string().max(1500).optional().default(""),
   bodyVi: z.string().max(1500).optional().default(""),
   validFrom: z.string().nullable().optional(),
@@ -45,6 +45,9 @@ export const Route = createFileRoute("/api/manager/promotions")({
         const values = {
           ...promotionData,
           id,
+          titleVi: promotionData.titleVi ?? promotionData.titleEn,
+          bodyVi: promotionData.bodyVi ?? promotionData.bodyEn,
+          bonusTermsVi: promotionData.bonusTermsVi ?? promotionData.bonusTermsEn,
           validFrom: promotionData.validFrom ?? null,
           validTo: promotionData.validTo ?? null,
           relatedPlanId: promotionData.relatedPlanId ?? null,
@@ -56,6 +59,9 @@ export const Route = createFileRoute("/api/manager/promotions")({
             .update(schema.promotions)
             .set({
               ...promotionData,
+              titleVi: values.titleVi,
+              bodyVi: values.bodyVi,
+              bonusTermsVi: values.bonusTermsVi,
               validFrom: values.validFrom,
               validTo: values.validTo,
               relatedPlanId: values.relatedPlanId,

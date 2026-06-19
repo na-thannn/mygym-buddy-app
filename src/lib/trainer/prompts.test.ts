@@ -29,4 +29,20 @@ describe("Alex system prompt", () => {
     expect(prompt).toContain("Never invent HL Fitness prices");
     expect(prompt).toContain("social links");
   });
+
+  it("allows confirmed customer-safe gym actions but keeps staff work out of Alex", () => {
+    const prompt = buildAlexSystemPrompt({
+      today: "2026-06-15",
+      contextText:
+        "HL Fitness gym knowledge:\n- Available classes: Yoga Flow has 2 seats left\n- Public PTs: Coach Linh",
+    });
+
+    expect(prompt).toContain("get_gym_knowledge");
+    expect(prompt).toContain("create_package_request");
+    expect(prompt).toContain("request_pt_session");
+    expect(prompt).toContain("book_group_class");
+    expect(prompt).toContain("cancel_group_class_booking");
+    expect(prompt).toContain("explicit confirmation");
+    expect(prompt).toContain("payments, membership activation, refunds");
+  });
 });

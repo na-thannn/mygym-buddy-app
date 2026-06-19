@@ -13,6 +13,7 @@ import { hasAnyRole } from "@/lib/roles";
 import { db, schema } from "@/server/db";
 import { getSessionUser, hashPassword, newId } from "@/server/auth";
 import { sendGuestMeetingConfirmationEmail, sendTemporaryPasswordEmail } from "@/server/email";
+import { sendZaloEvent } from "@/server/zalo";
 import logDevError from "@/lib/error-logger";
 
 const createSchema = z.object({
@@ -23,13 +24,37 @@ const createSchema = z.object({
   experience: z.enum(["Beginner", "Intermediate", "Advanced"]),
   requestedPtId: z.string().min(1),
   scheduledAt: z.string().datetime(),
+  meetingType: z.enum(["in_person", "online"]).default("in_person"),
 });
 
 const patchSchema = z.object({
   id: z.string().min(1),
-  action: z.enum(["complete", "cancel", "reassign", "send-login"]),
+  action: z.enum([
+    "complete",
+    "cancel",
+    "reassign",
+    "send-login",
+    "set-link",
+    "remind",
+    "send-zalo",
+  ]),
   ptId: z.string().min(1).optional(),
+  onlineMeetingUrl: z.string().trim().url().max(500).optional(),
 });
+
+function meetingZaloTarget(meeting: { zaloUserId?: string | null; guestPhone: string }): string {
+  return (meeting.zaloUserId && meeting.zaloUserId.trim()) || meeting.guestPhone;
+}
+
+function formatMeetingWhen(scheduledAt: string): string {
+  const date = new Date(scheduledAt);
+  if (Number.isNaN(date.getTime())) return scheduledAt;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Saigon",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
 
 const activeBookingStatuses = new Set(["pending", "rescheduled", "confirmed"]);
 
@@ -80,7 +105,9 @@ export const Route = createFileRoute("/api/guest-meetings")({
             pts,
             existingBookings: await getActiveBookings(),
             existingGuestMeetings: await getGuestMeetingSlots(),
-            unavailableDays: await getUnavailableDaysForDate(getSaigonDate(data.scheduledAt)),
+            unavailabilityBlocks: await getUnavailabilityBlocksForDate(
+              getSaigonDate(data.scheduledAt),
+            ),
           });
           if (!selection) return json({ error: "No coach is available for that slot" }, 409);
 
@@ -88,21 +115,23 @@ export const Route = createFileRoute("/api/guest-meetings")({
           if (!assignedPt) return json({ error: "Assigned coach not found" }, 500);
 
           const id = newId();
-          await db
-            .insert(schema.guestMeetings)
-            .values({
-              id,
-              guestName: data.name,
-              guestEmail: data.email,
-              guestPhone: data.phone,
-              goal: data.goal,
-              experience: data.experience,
-              requestedPtId: data.requestedPtId,
-              assignedPtId: selection.assignedPtId,
-              scheduledAt: data.scheduledAt,
-              usedFallback: selection.usedFallback ? 1 : 0,
-              status: "confirmed",
-            });
+          const isOnline = data.meetingType === "online";
+          const onlineMeetingUrl = isOnline ? `https://meet.jit.si/HLFitness-${id}` : null;
+          await db.insert(schema.guestMeetings).values({
+            id,
+            guestName: data.name,
+            guestEmail: data.email,
+            guestPhone: data.phone,
+            goal: data.goal,
+            experience: data.experience,
+            requestedPtId: data.requestedPtId,
+            assignedPtId: selection.assignedPtId,
+            scheduledAt: data.scheduledAt,
+            usedFallback: selection.usedFallback ? 1 : 0,
+            meetingType: data.meetingType,
+            onlineMeetingUrl,
+            status: "confirmed",
+          });
 
           const email = await sendGuestMeetingConfirmationEmail({
             to: data.email,
@@ -110,6 +139,22 @@ export const Route = createFileRoute("/api/guest-meetings")({
             coachName: assignedPt.displayName,
             scheduledAt: data.scheduledAt,
           });
+
+          // Online guests are also contacted on Zalo (sandbox mode returns a
+          // clickable deep link when live credentials are not configured).
+          const zalo = isOnline
+            ? await sendZaloEvent({
+                to: data.phone,
+                event: "confirm",
+                templateData: {
+                  name: data.name,
+                  coach: assignedPt.displayName,
+                  time: formatMeetingWhen(data.scheduledAt),
+                  link: onlineMeetingUrl ?? "",
+                },
+              })
+            : null;
+
           const now = new Date().toISOString();
           await db
             .update(schema.guestMeetings)
@@ -125,6 +170,10 @@ export const Route = createFileRoute("/api/guest-meetings")({
             id,
             status: email.sent ? "confirmed" : "email_failed",
             emailSent: email.sent,
+            meetingType: data.meetingType,
+            onlineMeetingUrl,
+            zaloDeepLink: zalo?.deepLink ?? null,
+            zaloSent: zalo?.sent ?? false,
             assignedPtId: selection.assignedPtId,
             assignedPtName: assignedPt.displayName,
             usedFallback: selection.usedFallback,
@@ -163,6 +212,41 @@ export const Route = createFileRoute("/api/guest-meetings")({
         if (data.action === "cancel") {
           return await updateMeeting(data.id, { status: "cancelled" });
         }
+        if (data.action === "set-link") {
+          if (!data.onlineMeetingUrl) return json({ error: "onlineMeetingUrl required" }, 400);
+          return await updateMeeting(data.id, {
+            onlineMeetingUrl: data.onlineMeetingUrl,
+            meetingType: "online",
+          });
+        }
+        if (data.action === "remind") {
+          const zalo = await sendZaloEvent({
+            to: meetingZaloTarget(meeting),
+            event: "reminder",
+            templateData: {
+              name: meeting.guestName,
+              time: formatMeetingWhen(meeting.scheduledAt),
+              link: meeting.onlineMeetingUrl ?? "",
+            },
+          });
+          await db
+            .update(schema.guestMeetings)
+            .set({ reminderSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+            .where(eq(schema.guestMeetings.id, meeting.id));
+          return json({ ok: true, zaloSent: zalo.sent, zaloDeepLink: zalo.deepLink });
+        }
+        if (data.action === "send-zalo") {
+          const zalo = await sendZaloEvent({
+            to: meetingZaloTarget(meeting),
+            event: "confirm",
+            templateData: {
+              name: meeting.guestName,
+              time: formatMeetingWhen(meeting.scheduledAt),
+              link: meeting.onlineMeetingUrl ?? "",
+            },
+          });
+          return json({ ok: true, zaloSent: zalo.sent, zaloDeepLink: zalo.deepLink });
+        }
         if (data.action === "reassign") {
           if (!isOps) return json({ error: "Only managers can reassign guest meetings" }, 403);
           if (!data.ptId) return json({ error: "ptId required" }, 400);
@@ -176,7 +260,9 @@ export const Route = createFileRoute("/api/guest-meetings")({
             existingGuestMeetings: (await getGuestMeetingSlots()).filter(
               (slot) => slot.id !== meeting.id,
             ),
-            unavailableDays: await getUnavailableDaysForDate(getSaigonDate(meeting.scheduledAt)),
+            unavailabilityBlocks: await getUnavailabilityBlocksForDate(
+              getSaigonDate(meeting.scheduledAt),
+            ),
           });
           if (!selection) return json({ error: "PT is not available for that slot" }, 409);
           return await updateMeeting(data.id, { assignedPtId: data.ptId, usedFallback: 0 });
@@ -206,7 +292,7 @@ async function getActiveBookings() {
       scheduledAt: schema.bookings.scheduledAt,
       status: schema.bookings.status,
     })
-    .from(schema.bookings)
+    .from(schema.bookings);
   return rows.filter((row) => activeBookingStatuses.has(row.status));
 }
 
@@ -221,14 +307,19 @@ async function getGuestMeetingSlots() {
     .from(schema.guestMeetings);
 }
 
-async function getUnavailableDaysForDate(unavailableDate: string) {
+async function getUnavailabilityBlocksForDate(unavailableDate: string) {
   return await db
     .select({
-      ptId: schema.ptUnavailableDays.ptId,
-      unavailableDate: schema.ptUnavailableDays.unavailableDate,
+      id: schema.ptUnavailabilityBlocks.id,
+      ptId: schema.ptUnavailabilityBlocks.ptId,
+      unavailableDate: schema.ptUnavailabilityBlocks.unavailableDate,
+      allDay: schema.ptUnavailabilityBlocks.allDay,
+      startTime: schema.ptUnavailabilityBlocks.startTime,
+      endTime: schema.ptUnavailabilityBlocks.endTime,
+      reason: schema.ptUnavailabilityBlocks.reason,
     })
-    .from(schema.ptUnavailableDays)
-    .where(eq(schema.ptUnavailableDays.unavailableDate, unavailableDate));
+    .from(schema.ptUnavailabilityBlocks)
+    .where(eq(schema.ptUnavailabilityBlocks.unavailableDate, unavailableDate));
 }
 
 async function updateMeeting(id: string, patch: Partial<typeof schema.guestMeetings.$inferInsert>) {
@@ -277,30 +368,34 @@ async function sendLoginForGuestMeeting(
       })
       .where(eq(schema.users.id, userId));
   } else {
-    await db
-      .insert(schema.users)
-      .values({
-        id: userId,
-        email: meeting.guestEmail,
-        passwordHash: hashPassword(password),
-        displayName: meeting.guestName,
-        role: "customer",
-        assignedPtId: meeting.assignedPtId,
-        mustChangePassword: 1,
-      });
-    await db
-      .insert(schema.profiles)
-      .values({
-        userId,
-        goal: meeting.goal,
-        level: meeting.experience,
-      });
+    await db.insert(schema.users).values({
+      id: userId,
+      email: meeting.guestEmail,
+      passwordHash: hashPassword(password),
+      displayName: meeting.guestName,
+      role: "customer",
+      assignedPtId: meeting.assignedPtId,
+      mustChangePassword: 1,
+    });
+    await db.insert(schema.profiles).values({
+      userId,
+      goal: meeting.goal,
+      level: meeting.experience,
+    });
   }
 
   const email = await sendTemporaryPasswordEmail({
     to: meeting.guestEmail,
     guestName: meeting.guestName,
     password,
+  });
+  const zalo = await sendZaloEvent({
+    to: meetingZaloTarget(meeting),
+    event: "login",
+    templateData: {
+      name: meeting.guestName,
+      password,
+    },
   });
   await db
     .update(schema.guestMeetings)
@@ -315,6 +410,8 @@ async function sendLoginForGuestMeeting(
   return json({
     ok: true,
     emailSent: email.sent,
+    zaloSent: zalo.sent,
+    zaloDeepLink: zalo.deepLink,
     userId,
     actorId,
     status: email.sent ? "account_invited" : "email_failed",

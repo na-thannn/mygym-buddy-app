@@ -1,3 +1,5 @@
+import { isIntervalBlockedByPtUnavailability, type PtUnavailabilityBlock } from "./pt-availability";
+
 const SAIGON_OFFSET_MS = 7 * 60 * 60 * 1000;
 const SLOT_HOURS = [9, 14, 18] as const;
 const ACTIVE_GUEST_STATUSES = new Set([
@@ -24,18 +26,13 @@ export type ExistingGuestMeetingSlot = {
   status?: string | null;
 };
 
-export type PtUnavailableDay = {
-  ptId: string;
-  unavailableDate: string;
-};
-
 export type PtSelectionInput = {
   requestedPtId: string;
   scheduledAt: string;
   pts: MeetingPt[];
   existingBookings: ExistingBookingSlot[];
   existingGuestMeetings: ExistingGuestMeetingSlot[];
-  unavailableDays: PtUnavailableDay[];
+  unavailabilityBlocks: PtUnavailabilityBlock[];
 };
 
 export type PtSelectionResult = {
@@ -109,11 +106,16 @@ export function getSaigonDate(isoDateTime: string): string {
 }
 
 function isPtAvailable(ptId: string, input: PtSelectionInput): boolean {
-  const meetingDate = getSaigonDate(input.scheduledAt);
-  const hasDayOff = input.unavailableDays.some(
-    (day) => day.ptId === ptId && day.unavailableDate === meetingDate,
-  );
-  if (hasDayOff) return false;
+  if (
+    isIntervalBlockedByPtUnavailability({
+      ptId,
+      startsAt: input.scheduledAt,
+      durationMinutes: 60,
+      blocks: input.unavailabilityBlocks,
+    })
+  ) {
+    return false;
+  }
 
   const hasBookingConflict = input.existingBookings.some(
     (booking) => booking.ptId === ptId && booking.scheduledAt === input.scheduledAt,

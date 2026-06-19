@@ -19,4 +19,11 @@ describe("app layout nav classes", () => {
     expect(className).toContain("py-2");
     expect(className).toContain("text-[13px]");
   });
+
+  test("child items are visually nested and slightly smaller", () => {
+    const className = getSidebarNavItemClassName(false, "child");
+
+    expect(className).toContain("border-l");
+    expect(className).toContain("pl-4");
+  });
 });

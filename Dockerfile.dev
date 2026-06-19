@@ -1,0 +1,22 @@
+FROM node:22-alpine
+
+# libc6-compat provides the glibc shims some native dev deps (Tailwind oxide,
+# lightningcss, rollup) expect on musl-based Alpine.
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Install dependencies into the image layer so the container has its own
+# Linux/musl node_modules, independent of the host's (Windows) node_modules.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Bake the entrypoint outside /app so the runtime bind mount on /app cannot mask
+# it. sed strips any CRLF added on a Windows host so /bin/sh can run it.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+  && chmod +x /usr/local/bin/docker-entrypoint.sh
+
+EXPOSE 5173
+
+ENTRYPOINT ["docker-entrypoint.sh"]

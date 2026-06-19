@@ -13,7 +13,9 @@ import {
   Dumbbell,
   Home,
   Loader2,
+  MapPin,
   Trophy,
+  Video,
   Weight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -46,6 +48,9 @@ type SubmitResult = {
   emailSent: boolean;
   assignedPtName: string;
   usedFallback: boolean;
+  meetingType?: "in_person" | "online";
+  onlineMeetingUrl?: string | null;
+  zaloDeepLink?: string | null;
 };
 
 type CalendarSlot = SlotOption & {
@@ -75,6 +80,7 @@ function GetStarted() {
     phone: "",
     requestedPtId: "",
     scheduledAt: "",
+    meetingType: "in_person" as "in_person" | "online",
   });
 
   const goals = [
@@ -118,6 +124,7 @@ function GetStarted() {
           experience: data.experience,
           requestedPtId: data.requestedPtId,
           scheduledAt: data.scheduledAt,
+          meetingType: data.meetingType,
         }),
       });
       const payload = await res.json().catch(() => ({}));
@@ -335,6 +342,43 @@ function GetStarted() {
                         title="Pick a coach and time"
                         desc="If the selected coach is unavailable for that slot, we assign the first available coach."
                       />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {[
+                          {
+                            value: "in_person" as const,
+                            icon: MapPin,
+                            title: "In person",
+                            desc: "Meet your coach at 303 Le Thanh Nghi.",
+                          },
+                          {
+                            value: "online" as const,
+                            icon: Video,
+                            title: "Online",
+                            desc: "We send a video link and reach out on Zalo.",
+                          },
+                        ].map((option) => {
+                          const Icon = option.icon;
+                          const active = data.meetingType === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setData({ ...data, meetingType: option.value })}
+                              className={`rounded-xl border p-4 text-left transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                                active
+                                  ? "border-primary bg-primary/12 text-primary"
+                                  : "border-white/10 bg-white/[0.04] text-stone-200 hover:bg-white/[0.07]"
+                              }`}
+                            >
+                              <Icon className="mb-3 size-5" strokeWidth={1.8} />
+                              <div className="font-semibold text-stone-50">{option.title}</div>
+                              <div className="mt-1 text-xs leading-5 text-stone-400">
+                                {option.desc}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                       {!options && (
                         <div className="grid gap-3">
                           {[0, 1, 2, 3].map((item) => (
@@ -510,6 +554,33 @@ function GetStarted() {
                         <div className="mx-auto mt-5 max-w-md rounded-xl border border-primary/25 bg-primary/10 p-4 text-sm leading-6 text-stone-200">
                           Your selected coach was unavailable, so we assigned the first available
                           coach.
+                        </div>
+                      )}
+                      {result.meetingType === "online" && (
+                        <div className="mx-auto mt-5 max-w-md space-y-2 rounded-xl border border-primary/25 bg-primary/10 p-4 text-sm leading-6 text-stone-200">
+                          <div className="flex items-center justify-center gap-2 font-medium text-primary">
+                            <Video className="size-4" strokeWidth={1.8} /> Online meeting
+                          </div>
+                          {result.onlineMeetingUrl && (
+                            <a
+                              href={result.onlineMeetingUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block break-all text-primary underline underline-offset-4"
+                            >
+                              {result.onlineMeetingUrl}
+                            </a>
+                          )}
+                          {result.zaloDeepLink && (
+                            <a
+                              href={result.zaloDeepLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block text-stone-300 underline underline-offset-4"
+                            >
+                              Open chat on Zalo
+                            </a>
+                          )}
                         </div>
                       )}
                       <Button

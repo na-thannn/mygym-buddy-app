@@ -152,6 +152,10 @@ describe("chat API handler", () => {
       messages: [...previousMessages, latestMessage],
       tools: {},
     });
+    expect(toolsMock.buildAlexTools).toHaveBeenCalledWith({
+      userId: "user-1",
+      role: "customer",
+    });
     expect(promptMock.buildAlexSystemPrompt).toHaveBeenCalledWith({
       today: "2026-06-04",
       contextText: "Member context:\n- Goal: Build strength",

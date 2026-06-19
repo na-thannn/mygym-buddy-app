@@ -23,12 +23,11 @@ import {
   UserSquare2,
 } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
-import { AccessDenied } from "@/components/AccessDenied";
 import { ROLE_LABELS, type AppRole } from "@/lib/roles";
 
-export const Route = createFileRoute("/_authenticated/admin")({
+export const Route = createFileRoute("/_authenticated/admin/")({
   head: () => ({ meta: [{ title: "Admin - HL Fitness" }] }),
-  component: AdminPage,
+  component: AdminIndexPage,
 });
 
 type AdminUser = {
@@ -52,12 +51,11 @@ type AdminStats = {
   unassignedCustomers: number;
   ptLoads: { id: string; displayName: string; email: string; assignedCount: number }[];
   bookingsByStatus: Record<string, number>;
-  supportByStatus: Record<string, number>;
   openSupportTickets: number;
-  groupClasses: { sessions: number; enrollments: number; attended: number };
+  groupClasses: { sessions: number; attended: number };
 };
 
-function AdminPage() {
+function AdminIndexPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -87,7 +85,7 @@ function AdminPage() {
         setUsers((usersRes as { users: AdminUser[] }).users ?? []);
         setPts((usersRes as { pts: PtOption[] }).pts ?? []);
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to load admin data");
     } finally {
       setLoading(false);
@@ -137,73 +135,91 @@ function AdminPage() {
     }
   };
 
-  if (user?.role !== "admin") {
-    return <AccessDenied title="Admin access required" />;
-  }
+  if (user?.role !== "admin") return null;
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-8 pb-24 md:pb-8">
-      <PageHeader title="Admin" subtitle="Manage users, roles, and PT assignments." />
+    <div className="mx-auto max-w-6xl p-4 pb-24 md:p-8 md:pb-8">
+      <PageHeader
+        title="Admin control panel"
+        subtitle="Manage members, roles, and trainer assignments for HL Fitness."
+      />
 
       {loading && <div className="text-sm text-slate-400">Loading admin data...</div>}
 
       {!loading && stats && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <StatCard
-            label="Total users"
-            value={stats.totalUsers}
-            icon={<Users className="size-5" />}
-          />
-          <StatCard
-            label="Customers"
-            value={stats.byRole.customer}
-            icon={<UserSquare2 className="size-5" />}
-          />
-          <StatCard label="PTs" value={stats.byRole.pt} icon={<BadgeCheck className="size-5" />} />
-          <StatCard
-            label="Managers"
-            value={stats.byRole.manager}
-            icon={<Shield className="size-5" />}
-          />
-          <StatCard
-            label="Unassigned"
-            value={stats.unassignedCustomers}
-            icon={<UserCog className="size-5" />}
-          />
-          <StatCard
-            label="Open support"
-            value={stats.openSupportTickets}
-            icon={<Headphones className="size-5" />}
-          />
-          <StatCard
-            label="Bookings"
-            value={Object.values(stats.bookingsByStatus ?? {}).reduce(
-              (sum, value) => sum + value,
-              0,
-            )}
-            icon={<Shield className="size-5" />}
-          />
-          <StatCard
-            label="Class sessions"
-            value={stats.groupClasses.sessions}
-            icon={<CalendarDays className="size-5" />}
-          />
-          <StatCard
-            label="Attendance"
-            value={stats.groupClasses.attended}
-            icon={<BadgeCheck className="size-5" />}
-          />
-        </div>
+        <>
+          <div className="mb-3 mt-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Overview
+            </div>
+            <p className="mt-1 text-sm text-slate-400">A quick snapshot of your gym today.</p>
+          </div>
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Total users"
+              value={stats.totalUsers}
+              icon={<Users className="size-5" />}
+            />
+            <StatCard
+              label="Members"
+              value={stats.byRole.customer}
+              icon={<UserSquare2 className="size-5" />}
+            />
+            <StatCard
+              label="Trainers"
+              value={stats.byRole.pt}
+              icon={<BadgeCheck className="size-5" />}
+            />
+            <StatCard
+              label="Managers"
+              value={stats.byRole.manager}
+              icon={<Shield className="size-5" />}
+            />
+            <StatCard
+              label="Members without a PT"
+              value={stats.unassignedCustomers}
+              icon={<UserCog className="size-5" />}
+            />
+            <StatCard
+              label="Open support tickets"
+              value={stats.openSupportTickets}
+              icon={<Headphones className="size-5" />}
+            />
+            <StatCard
+              label="Total bookings"
+              value={Object.values(stats.bookingsByStatus ?? {}).reduce(
+                (sum, value) => sum + value,
+                0,
+              )}
+              icon={<Shield className="size-5" />}
+            />
+            <StatCard
+              label="Class sessions"
+              value={stats.groupClasses.sessions}
+              icon={<CalendarDays className="size-5" />}
+            />
+            <StatCard
+              label="Class attendance"
+              value={stats.groupClasses.attended}
+              icon={<BadgeCheck className="size-5" />}
+            />
+          </div>
+        </>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
         <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-6">
-          <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="mb-4 flex items-center justify-between gap-4">
             <div>
-              <div className="text-xs text-slate-400">User management</div>
-              <h2 className="text-lg font-semibold text-slate-100 mt-2">Roles and assignments</h2>
+              <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+                User management
+              </div>
+              <h2 className="mt-2 text-lg font-semibold text-slate-100">Roles and assignments</h2>
+              <p className="mt-1 text-xs text-slate-400">
+                Change a person&apos;s role, or assign a coach to a member.
+              </p>
             </div>
-            <div className="size-10 rounded-2xl bg-white/[0.05] border border-white/10 grid place-items-center text-slate-300">
+            <div className="grid size-10 place-items-center rounded-2xl border border-white/10 bg-white/[0.05] text-slate-300">
               <Shield className="size-5" />
             </div>
           </div>
@@ -224,7 +240,7 @@ function AdminPage() {
             {filteredUsers.map((u) => (
               <div
                 key={u.id}
-                className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 flex flex-col gap-3"
+                className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -293,7 +309,7 @@ function AdminPage() {
                     >
                       {savingId === u.id ? (
                         <>
-                          <Loader2 className="size-4 mr-2 animate-spin" />
+                          <Loader2 className="mr-2 size-4 animate-spin" />
                           Saving...
                         </>
                       ) : (
@@ -309,15 +325,18 @@ function AdminPage() {
 
         <div className="space-y-6">
           <div className="rounded-2xl border border-white/10 bg-[#111612]/95 p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <div>
-                <div className="text-xs text-slate-400">PT load</div>
-                <h2 className="text-lg font-semibold text-slate-100 mt-2">Client assignments</h2>
+                <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+                  Trainer load
+                </div>
+                <h2 className="mt-2 text-lg font-semibold text-slate-100">Client assignments</h2>
               </div>
-              <div className="size-10 rounded-2xl bg-white/[0.05] border border-white/10 grid place-items-center text-slate-300">
+              <div className="grid size-10 place-items-center rounded-2xl border border-white/10 bg-white/[0.05] text-slate-300">
                 <UserCog className="size-5" />
               </div>
             </div>
+
             {stats?.ptLoads?.length ? (
               <div className="space-y-3">
                 {stats.ptLoads.map((pt) => (
@@ -349,9 +368,9 @@ function StatCard({ label, value, icon }: { label: string; value: number; icon: 
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs text-slate-400">{label}</div>
-          <div className="text-2xl font-semibold text-slate-100 mt-2">{value}</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-100">{value}</div>
         </div>
-        <div className="size-10 rounded-2xl bg-primary/15 text-primary grid place-items-center">
+        <div className="grid size-10 place-items-center rounded-2xl bg-primary/15 text-primary">
           {icon}
         </div>
       </div>

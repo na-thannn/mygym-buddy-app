@@ -1,9 +1,9 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
-import { formatVnd } from "@/lib/crm";
 import { db, schema } from "@/server/db";
+import { buildGymKnowledge } from "./gym-knowledge";
 
 const DEFAULT_CONTEXT_DAYS = 21;
-const MAX_CONTEXT_CHARS = 5600;
+const MAX_CONTEXT_CHARS = 9000;
 
 type BuildTrainerContextInput = {
   userId: string;
@@ -91,41 +91,7 @@ export async function buildTrainerContext({
       .limit(3),
   ]);
   const profile = profileRows[0];
-  const [userRows, memberships, purchaseRequests, publicPlans, publicPromotions, publicServices] =
-    await Promise.all([
-      db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1),
-      db
-        .select()
-        .from(schema.memberships)
-        .where(eq(schema.memberships.customerId, userId))
-        .orderBy(desc(schema.memberships.endsOn))
-        .limit(5),
-      db
-        .select()
-        .from(schema.purchaseRequests)
-        .where(eq(schema.purchaseRequests.customerId, userId))
-        .orderBy(desc(schema.purchaseRequests.createdAt))
-        .limit(5),
-      db
-        .select()
-        .from(schema.membershipPlans)
-        .where(and(eq(schema.membershipPlans.active, 1), eq(schema.membershipPlans.isPublic, 1)))
-        .orderBy(desc(schema.membershipPlans.createdAt))
-        .limit(8),
-      db
-        .select()
-        .from(schema.promotions)
-        .where(and(eq(schema.promotions.active, 1), eq(schema.promotions.isPublic, 1)))
-        .orderBy(desc(schema.promotions.createdAt))
-        .limit(5),
-      db
-        .select()
-        .from(schema.serviceOfferings)
-        .where(and(eq(schema.serviceOfferings.active, 1), eq(schema.serviceOfferings.isPublic, 1)))
-        .orderBy(desc(schema.serviceOfferings.createdAt))
-        .limit(8),
-    ]);
-  const member = userRows[0];
+  const gymKnowledge = await buildGymKnowledge({ userId, now });
 
   const sections = [
     `Member context (today ${endDate}, recent window ${startDate} to ${endDate})`,
@@ -136,14 +102,7 @@ export async function buildTrainerContext({
     formatInbody(inbody),
     formatPlans(plans),
     formatAnalyses(analyses),
-    formatSalesContext({
-      memberships,
-      purchaseRequests,
-      publicPlans,
-      publicPromotions,
-      publicServices,
-      assignedPtId: member?.assignedPtId ?? null,
-    }),
+    gymKnowledge.text,
   ].filter(Boolean);
 
   return {
@@ -256,65 +215,6 @@ function formatAnalyses(analyses: Array<typeof schema.analyses.$inferSelect>) {
       (row) => `- ${row.planDate}: ${limitText(row.contentMd.replace(/\s+/g, " "), 240)}`,
     ),
   ].join("\n");
-}
-
-function formatSalesContext({
-  memberships,
-  purchaseRequests,
-  publicPlans,
-  publicPromotions,
-  publicServices,
-  assignedPtId,
-}: {
-  memberships: Array<typeof schema.memberships.$inferSelect>;
-  purchaseRequests: Array<typeof schema.purchaseRequests.$inferSelect>;
-  publicPlans: Array<typeof schema.membershipPlans.$inferSelect>;
-  publicPromotions: Array<typeof schema.promotions.$inferSelect>;
-  publicServices: Array<typeof schema.serviceOfferings.$inferSelect>;
-  assignedPtId: string | null;
-}) {
-  const lines = ["HL Fitness member and package context:"];
-  lines.push(`- Assigned PT: ${assignedPtId || "not assigned"}`);
-  if (memberships.length === 0) {
-    lines.push("- Active membership: none saved");
-  } else {
-    for (const membership of memberships.slice(0, 3)) {
-      lines.push(
-        `- Membership ${membership.status}: ${membership.planId || "unknown plan"}, ${membership.startsOn} to ${membership.endsOn}, paid price ${formatVnd(membership.priceVndAtPurchase)}`,
-      );
-    }
-  }
-  if (purchaseRequests.length > 0) {
-    lines.push(
-      `- Package requests: ${purchaseRequests
-        .map((request) => {
-          const target = request.planId || request.serviceOfferingId || "custom";
-          return `${request.status} ${target}${request.message ? ` (${request.message})` : ""}`;
-        })
-        .join("; ")}`,
-    );
-  }
-  if (publicPlans.length > 0) {
-    lines.push("- Public plans and DB-backed prices:");
-    for (const plan of publicPlans) {
-      lines.push(
-        `  - ${plan.nameEn}: ${formatVnd(plan.priceVnd)} / ${plan.durationDays} days${plan.includesPtSessions ? `, includes ${plan.includesPtSessions} PT sessions` : ""}`,
-      );
-    }
-  }
-  if (publicServices.length > 0) {
-    lines.push("- Public services and DB-backed prices:");
-    for (const service of publicServices) {
-      lines.push(`  - ${service.nameEn}: ${formatVnd(service.priceVnd)}`);
-    }
-  }
-  if (publicPromotions.length > 0) {
-    lines.push("- Public promotions:");
-    for (const promo of publicPromotions) {
-      lines.push(`  - ${promo.titleEn}: ${promo.bonusTermsEn || promo.bodyEn}`);
-    }
-  }
-  return lines.join("\n");
 }
 
 function limitText(value: string, max: number) {
