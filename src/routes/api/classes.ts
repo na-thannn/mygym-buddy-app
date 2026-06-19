@@ -11,6 +11,7 @@ import {
 } from "@/lib/group-classes";
 import { hasAnyRole } from "@/lib/roles";
 import logDevError from "@/lib/error-logger";
+import { isIntervalBlockedByPtUnavailability } from "@/lib/pt-availability";
 
 const inputSchema = z.discriminatedUnion("action", [
   z.object({
@@ -179,6 +180,16 @@ export const Route = createFileRoute("/api/classes")({
               if (!trainer || !["pt", "manager", "admin"].includes(trainer.role)) {
                 return json({ error: "Trainer not found" }, 400);
               }
+              if (
+                trainer.role === "pt" &&
+                (await isPtUnavailableForClassSession(
+                  data.trainerId,
+                  data.startsAt,
+                  data.durationMinutes,
+                ))
+              ) {
+                return json({ error: "Trainer is unavailable for that time" }, 409);
+              }
             }
             const id = newId();
             await db
@@ -295,6 +306,18 @@ export const Route = createFileRoute("/api/classes")({
     },
   },
 });
+
+async function isPtUnavailableForClassSession(
+  ptId: string,
+  startsAt: string,
+  durationMinutes: number,
+): Promise<boolean> {
+  const blocks = await db
+    .select()
+    .from(schema.ptUnavailabilityBlocks)
+    .where(eq(schema.ptUnavailabilityBlocks.ptId, ptId));
+  return isIntervalBlockedByPtUnavailability({ ptId, startsAt, durationMinutes, blocks });
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

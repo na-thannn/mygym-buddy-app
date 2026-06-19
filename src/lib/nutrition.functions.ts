@@ -3,7 +3,7 @@ import logDevError from "@/lib/error-logger";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { generateObject } from "ai";
-import { getGroq, FAST_MODEL_ID } from "./trainer/groq";
+import { getGroq, FAST_MODEL_ID, ALEX_VISION_MODEL_ID } from "./trainer/groq";
 
 async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
@@ -62,6 +62,42 @@ Post-workout: ${meals.postWorkoutMeal || "(none)"}`;
   return object;
 }
 
+const mealVisionSchema = z.object({
+  name: z.string(),
+  calories: z.number(),
+  protein_g: z.number(),
+  carbs_g: z.number(),
+  fats_g: z.number(),
+});
+
+// Identify a meal from a photo (and optional note) and estimate its macros.
+// Uses a multimodal model; the OpenAI-compatible provider forwards the data
+// URL as an image_url part.
+export async function estimateMealFromImage(input: { imageDataUrl: string; note?: string | null }) {
+  const groq = getGroq();
+  const promptText = [
+    "You are a nutrition assistant. Identify the meal in this photo and estimate the macros for the portion shown.",
+    input.note ? `The member also wrote: "${input.note}".` : "",
+    "Return a short meal name plus totals in grams and kcal.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const { object } = await generateObject({
+    model: groq(ALEX_VISION_MODEL_ID),
+    schema: mealVisionSchema,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: promptText },
+          { type: "image", image: input.imageDataUrl },
+        ],
+      },
+    ],
+  });
+  return object;
+}
+
 export const saveNutritionReport = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => reportInput.parse(d))
   .handler(async ({ data }) => {
@@ -91,25 +127,23 @@ export const saveNutritionReport = createServerFn({ method: "POST" })
     };
     const id = newId();
     try {
-      await db
-        .insert(schema.nutritionReports)
-        .values({
-          id,
-          userId: session.userId,
-          reportDate: data.reportDate,
-          breakfast: data.breakfast ?? null,
-          lunch: data.lunch ?? null,
-          dinner: data.dinner ?? null,
-          snacks: data.snacks ?? null,
-          dayType: data.dayType ?? null,
-          preWorkoutMeal: data.preWorkoutMeal ?? null,
-          postWorkoutMeal: data.postWorkoutMeal ?? null,
-          notes: data.notes ?? null,
-          calories: resolvedMacros.calories ?? null,
-          proteinG: resolvedMacros.proteinG ?? null,
-          carbsG: resolvedMacros.carbsG ?? null,
-          fatsG: resolvedMacros.fatsG ?? null,
-        });
+      await db.insert(schema.nutritionReports).values({
+        id,
+        userId: session.userId,
+        reportDate: data.reportDate,
+        breakfast: data.breakfast ?? null,
+        lunch: data.lunch ?? null,
+        dinner: data.dinner ?? null,
+        snacks: data.snacks ?? null,
+        dayType: data.dayType ?? null,
+        preWorkoutMeal: data.preWorkoutMeal ?? null,
+        postWorkoutMeal: data.postWorkoutMeal ?? null,
+        notes: data.notes ?? null,
+        calories: resolvedMacros.calories ?? null,
+        proteinG: resolvedMacros.proteinG ?? null,
+        carbsG: resolvedMacros.carbsG ?? null,
+        fatsG: resolvedMacros.fatsG ?? null,
+      });
       const hasMacros = Object.values(resolvedMacros).some((v) => typeof v === "number");
       return { ok: true, id, macros: hasMacros ? resolvedMacros : null };
     } catch (err) {

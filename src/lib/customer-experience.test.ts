@@ -9,6 +9,7 @@ import {
   buildTodayChecklist,
   buildWorkoutQuickActions,
   buildWeeklyCheckIn,
+  buildWeeklyStreak,
   getTrainerPromptFromSearch,
   selectActivePlan,
   getCustomerNavLabel,
@@ -475,5 +476,58 @@ describe("customer experience helpers", () => {
     );
     expect(getTrainerPromptFromSearch("?prompt=%20%20")).toBe("");
     expect(getTrainerPromptFromSearch("")).toBe("");
+  });
+});
+
+describe("buildWeeklyStreak", () => {
+  test("counts distinct training days in the trailing 7-day window", () => {
+    const streak = buildWeeklyStreak({
+      today: "2026-06-17",
+      workouts: [
+        { performedAt: "2026-06-17" },
+        { performedAt: "2026-06-17" },
+        { performedAt: "2026-06-15" },
+        { performedAt: "2026-06-11" },
+        { performedAt: "2026-06-09" },
+      ],
+    });
+
+    expect(streak.windowDays).toBe(7);
+    expect(streak.sessionsThisWeek).toBe(3);
+    expect(streak.percent).toBe(43);
+  });
+
+  test("counts a consecutive day streak ending today", () => {
+    const streak = buildWeeklyStreak({
+      today: "2026-06-17",
+      workouts: [
+        { performedAt: "2026-06-17" },
+        { performedAt: "2026-06-16" },
+        { performedAt: "2026-06-15" },
+        { performedAt: "2026-06-13" },
+      ],
+    });
+
+    expect(streak.currentStreak).toBe(3);
+  });
+
+  test("keeps an active streak alive when today has no workout yet", () => {
+    const streak = buildWeeklyStreak({
+      today: "2026-06-17",
+      workouts: [{ performedAt: "2026-06-16" }, { performedAt: "2026-06-15" }],
+    });
+
+    expect(streak.currentStreak).toBe(2);
+  });
+
+  test("returns an empty streak with no workouts", () => {
+    const streak = buildWeeklyStreak({ today: "2026-06-17", workouts: [] });
+
+    expect(streak).toEqual({
+      sessionsThisWeek: 0,
+      windowDays: 7,
+      currentStreak: 0,
+      percent: 0,
+    });
   });
 });

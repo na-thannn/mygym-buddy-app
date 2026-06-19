@@ -79,6 +79,46 @@ export function buildTodayChecklist({
   ];
 }
 
+export type WeeklyStreak = {
+  sessionsThisWeek: number;
+  windowDays: number;
+  currentStreak: number;
+  percent: number;
+};
+
+// Weekly training consistency from recent workout logs. sessionsThisWeek counts
+// distinct days trained in the trailing 7-day window (including today);
+// currentStreak counts consecutive days with a workout ending today (or
+// yesterday, so a not-yet-trained today does not break an active streak).
+export function buildWeeklyStreak({
+  today,
+  workouts,
+  windowDays = 7,
+}: {
+  today: string;
+  workouts: TodayWorkout[];
+  windowDays?: number;
+}): WeeklyStreak {
+  const trained = new Set(
+    workouts.map((workout) => (workout.performedAt ?? "").slice(0, 10)).filter(Boolean),
+  );
+
+  let sessionsThisWeek = 0;
+  for (let i = 0; i < windowDays; i += 1) {
+    if (trained.has(addDaysYmd(today, -i))) sessionsThisWeek += 1;
+  }
+
+  let currentStreak = 0;
+  let cursor = trained.has(today) ? today : addDaysYmd(today, -1);
+  while (trained.has(cursor)) {
+    currentStreak += 1;
+    cursor = addDaysYmd(cursor, -1);
+  }
+
+  const percent = windowDays > 0 ? Math.round((sessionsThisWeek / windowDays) * 100) : 0;
+  return { sessionsThisWeek, windowDays, currentStreak, percent };
+}
+
 type BookingEvent = {
   scheduledAt: string;
   status: string;

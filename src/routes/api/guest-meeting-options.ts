@@ -32,14 +32,17 @@ export const Route = createFileRoute("/api/guest-meeting-options")({
             status: schema.guestMeetings.status,
           })
           .from(schema.guestMeetings);
-        const unavailableDays = await db
+        const unavailabilityBlocks = await db
           .select({
-            id: schema.ptUnavailableDays.id,
-            ptId: schema.ptUnavailableDays.ptId,
-            unavailableDate: schema.ptUnavailableDays.unavailableDate,
-            reason: schema.ptUnavailableDays.reason,
+            id: schema.ptUnavailabilityBlocks.id,
+            ptId: schema.ptUnavailabilityBlocks.ptId,
+            unavailableDate: schema.ptUnavailabilityBlocks.unavailableDate,
+            allDay: schema.ptUnavailabilityBlocks.allDay,
+            startTime: schema.ptUnavailabilityBlocks.startTime,
+            endTime: schema.ptUnavailabilityBlocks.endTime,
+            reason: schema.ptUnavailabilityBlocks.reason,
           })
-          .from(schema.ptUnavailableDays);
+          .from(schema.ptUnavailabilityBlocks);
 
         const availability = pts.map((pt) => ({
           ptId: pt.id,
@@ -51,7 +54,7 @@ export const Route = createFileRoute("/api/guest-meeting-options")({
                 pts: [{ id: pt.id, displayName: pt.displayName }],
                 existingBookings: bookings,
                 existingGuestMeetings: meetings,
-                unavailableDays,
+                unavailabilityBlocks,
               }),
           ),
         }));

@@ -21,6 +21,7 @@ export const Route = createFileRoute("/api/feed")({
         const rows = await db
           .select({
             id: schema.communityFeed.id,
+            userId: schema.communityFeed.userId,
             content: schema.communityFeed.content,
             imageBase64: schema.communityFeed.imageBase64,
             likesCount: schema.communityFeed.likesCount,
@@ -63,15 +64,13 @@ export const Route = createFileRoute("/api/feed")({
           const createdAt = bodyObj?.createdAt
             ? String(bodyObj.createdAt)
             : new Date().toISOString();
-          await db
-            .insert(schema.communityFeed)
-            .values({
-              id,
-              userId: session.userId,
-              content,
-              imageBase64,
-              createdAt,
-            });
+          await db.insert(schema.communityFeed).values({
+            id,
+            userId: session.userId,
+            content,
+            imageBase64,
+            createdAt,
+          });
           return new Response(JSON.stringify({ ok: true, id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

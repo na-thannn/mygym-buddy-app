@@ -8,7 +8,7 @@ type ValidateTools = NonNullable<Parameters<typeof validateUIMessages>[0]["tools
 
 describe("Alex trainer tools", () => {
   it("accepts workout-plan goal and level details supplied during chat", async () => {
-    const tools = buildAlexTools("user-1");
+    const tools = buildAlexTools({ userId: "user-1", role: "customer" });
     const schemaKeys = (
       tools.generate_workout_plan.inputSchema as z.ZodObject<z.ZodRawShape>
     ).keyof().options;
@@ -40,5 +40,19 @@ describe("Alex trainer tools", () => {
     await expect(
       validateUIMessages({ messages, tools: tools as unknown as ValidateTools }),
     ).resolves.toEqual(messages);
+  });
+
+  it("exposes DB-backed gym knowledge and customer action tools", () => {
+    const tools = buildAlexTools({ userId: "user-1", role: "customer" });
+
+    expect(Object.keys(tools)).toEqual(
+      expect.arrayContaining([
+        "get_gym_knowledge",
+        "create_package_request",
+        "request_pt_session",
+        "book_group_class",
+        "cancel_group_class_booking",
+      ]),
+    );
   });
 });

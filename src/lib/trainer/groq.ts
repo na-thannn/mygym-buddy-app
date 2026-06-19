@@ -14,3 +14,6 @@ export function getGroq() {
 export const ALEX_MODEL_ID = process.env.ALEX_MODEL_ID ?? "llama-3.3-70b-versatile";
 // Smaller/faster for quick utility calls (macro estimation).
 export const FAST_MODEL_ID = process.env.ALEX_FAST_MODEL_ID ?? "llama-3.1-8b-instant";
+// Multimodal model for analysing meal photos (OpenAI-compatible image_url input).
+export const ALEX_VISION_MODEL_ID =
+  process.env.ALEX_VISION_MODEL_ID ?? "meta-llama/llama-4-scout-17b-16e-instruct";

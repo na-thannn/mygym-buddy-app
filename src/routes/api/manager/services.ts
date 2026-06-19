@@ -9,7 +9,7 @@ import { newId } from "@/server/auth";
 const serviceSchema = z.object({
   id: z.string().optional(),
   nameEn: z.string().trim().min(1).max(120),
-  nameVi: z.string().trim().min(1).max(120),
+  nameVi: z.string().trim().min(1).max(120).optional(),
   descriptionEn: z.string().max(1000).optional().default(""),
   descriptionVi: z.string().max(1000).optional().default(""),
   category: z.string().trim().min(1).max(80).default("training"),
@@ -39,11 +39,22 @@ export const Route = createFileRoute("/api/manager/services")({
         if (!parsed.success) return json({ error: "Invalid input", details: parsed.error }, 400);
         const id = parsed.data.id || newId();
         const { id: _inputId, ...serviceData } = parsed.data;
-        const values = { ...serviceData, id, updatedAt: new Date().toISOString() };
+        const values = {
+          ...serviceData,
+          nameVi: serviceData.nameVi ?? serviceData.nameEn,
+          descriptionVi: serviceData.descriptionVi ?? serviceData.descriptionEn,
+          id,
+          updatedAt: new Date().toISOString(),
+        };
         if (parsed.data.id) {
           await db
             .update(schema.serviceOfferings)
-            .set({ ...serviceData, updatedAt: values.updatedAt })
+            .set({
+              ...serviceData,
+              nameVi: values.nameVi,
+              descriptionVi: values.descriptionVi,
+              updatedAt: values.updatedAt,
+            })
             .where(eq(schema.serviceOfferings.id, id));
         } else {
           await db.insert(schema.serviceOfferings).values(values);

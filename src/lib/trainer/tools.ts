@@ -4,12 +4,21 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { newId } from "@/server/auth";
 import { estimateMacrosForMeals } from "@/lib/nutrition.functions";
+import type { Actor } from "@/lib/roles";
 import { getGroq, ALEX_MODEL_ID } from "./groq";
 import logDevError from "@/lib/error-logger";
 import { generateText } from "ai";
+import { buildGymKnowledge } from "./gym-knowledge";
+import {
+  bookGroupClassFromAlex,
+  cancelGroupClassBookingFromAlex,
+  createPackageRequestFromAlex,
+  requestPtSessionFromAlex,
+} from "./gym-actions";
 
 // All tools are bound to a specific userId at request time so the model can never escape that scope.
-export function buildAlexTools(userId: string) {
+export function buildAlexTools(actor: Actor) {
+  const userId = actor.userId;
   return {
     save_profile: tool({
       description:
@@ -50,6 +59,81 @@ export function buildAlexTools(userId: string) {
           .where(eq(schema.profiles.userId, userId))
           .limit(1);
         return row ?? { empty: true };
+      },
+    }),
+
+    get_gym_knowledge: tool({
+      description:
+        "Read fresh DB-backed HL Fitness knowledge for the current customer: branch/contact/hours, membership plans, PT services, promotions, events, public PTs, upcoming class availability, current membership, package requests, PT bookings, and class bookings. Use this before answering detailed gym catalog, class, event, PT, offer, or membership questions if the injected context may be stale or incomplete.",
+      inputSchema: z.object({
+        topic: z
+          .enum(["all", "plans", "offers", "classes", "pts", "events", "membership"])
+          .optional()
+          .default("all"),
+      }),
+      execute: async ({ topic }) => {
+        const knowledge = await buildGymKnowledge({ userId, topic });
+        return { ok: true, topic: knowledge.topic, text: knowledge.text };
+      },
+    }),
+
+    create_package_request: tool({
+      description:
+        "Create a customer package or PT-service interest request after the customer explicitly confirms the exact plan/service, optional preferred PT, contact phone, requested start date, and message. Never use this for payments or membership activation.",
+      inputSchema: z.object({
+        planId: z.string().nullable().optional(),
+        serviceOfferingId: z.string().nullable().optional(),
+        preferredPtId: z.string().nullable().optional(),
+        message: z.string().max(1000).optional().default(""),
+        contactPhone: z.string().max(40).optional().default(""),
+        requestedStartDate: z.string().nullable().optional(),
+        confirmed: z.boolean().default(false),
+      }),
+      execute: async ({ confirmed, ...input }) => {
+        if (!confirmed) return askForConfirmation();
+        return createPackageRequestFromAlex({ actor, ...input });
+      },
+    }),
+
+    request_pt_session: tool({
+      description:
+        "Create a PT session booking request for the current customer after explicit confirmation of PT, date/time, duration, and notes. This respects PT unavailable blocks and creates a pending booking, not a guaranteed completed payment.",
+      inputSchema: z.object({
+        ptId: z.string().nullable().optional(),
+        scheduledAt: z.string().describe("ISO datetime for the requested session start"),
+        durationMinutes: z.number().int().min(15).max(240).optional().default(60),
+        notes: z.string().max(1000).nullable().optional(),
+        confirmed: z.boolean().default(false),
+      }),
+      execute: async ({ confirmed, ...input }) => {
+        if (!confirmed) return askForConfirmation();
+        return requestPtSessionFromAlex({ actor, ...input });
+      },
+    }),
+
+    book_group_class: tool({
+      description:
+        "Book an available group class session for the current customer after explicit confirmation of the session. This respects session status, class capacity, and duplicate booking rules.",
+      inputSchema: z.object({
+        sessionId: z.string().min(1),
+        confirmed: z.boolean().default(false),
+      }),
+      execute: async ({ confirmed, sessionId }) => {
+        if (!confirmed) return askForConfirmation();
+        return bookGroupClassFromAlex({ actor, sessionId });
+      },
+    }),
+
+    cancel_group_class_booking: tool({
+      description:
+        "Cancel the current customer's own group class booking after explicit confirmation.",
+      inputSchema: z.object({
+        bookingId: z.string().min(1),
+        confirmed: z.boolean().default(false),
+      }),
+      execute: async ({ confirmed, bookingId }) => {
+        if (!confirmed) return askForConfirmation();
+        return cancelGroupClassBookingFromAlex({ actor, bookingId });
       },
     }),
 
@@ -363,5 +447,13 @@ Return ONLY the Markdown plan, no preamble.`;
         return row ?? { empty: true };
       },
     }),
+  };
+}
+
+function askForConfirmation() {
+  return {
+    ok: false,
+    error:
+      "Ask the customer for explicit confirmation of the exact action details before using this tool.",
   };
 }

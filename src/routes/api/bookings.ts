@@ -5,6 +5,7 @@ import { and, desc, eq, type SQL } from "drizzle-orm";
 import { parseRequestBody } from "@/lib/request-utils";
 import logDevError from "@/lib/error-logger";
 import { canManageBooking, hasAnyRole } from "@/lib/roles";
+import { isIntervalBlockedByPtUnavailability } from "@/lib/pt-availability";
 
 export const Route = createFileRoute("/api/bookings")({
   server: {
@@ -150,6 +151,12 @@ export const Route = createFileRoute("/api/bookings")({
                 headers: { "Content-Type": "application/json" },
               });
             }
+            if (await isPtUnavailableForSchedule(ptId, scheduledAt, durationMinutes)) {
+              return new Response(JSON.stringify({ error: "PT is unavailable for that time" }), {
+                status: 409,
+                headers: { "Content-Type": "application/json" },
+              });
+            }
           }
 
           const id = newId();
@@ -250,6 +257,19 @@ export const Route = createFileRoute("/api/bookings")({
             updates.scheduledAt = scheduledAt;
             if (typeof body?.durationMinutes === "number")
               updates.durationMinutes = body.durationMinutes;
+            if (
+              row.ptId &&
+              (await isPtUnavailableForSchedule(
+                row.ptId,
+                scheduledAt,
+                typeof body?.durationMinutes === "number" ? body.durationMinutes : row.durationMinutes,
+              ))
+            ) {
+              return new Response(JSON.stringify({ error: "PT is unavailable for that time" }), {
+                status: 409,
+                headers: { "Content-Type": "application/json" },
+              });
+            }
             updates.status = "rescheduled";
           } else if (action === "complete") {
             updates.status = "completed";
@@ -279,3 +299,15 @@ export const Route = createFileRoute("/api/bookings")({
     },
   },
 });
+
+async function isPtUnavailableForSchedule(
+  ptId: string,
+  startsAt: string,
+  durationMinutes: number,
+): Promise<boolean> {
+  const blocks = await db
+    .select()
+    .from(schema.ptUnavailabilityBlocks)
+    .where(eq(schema.ptUnavailabilityBlocks.ptId, ptId));
+  return isIntervalBlockedByPtUnavailability({ ptId, startsAt, durationMinutes, blocks });
+}

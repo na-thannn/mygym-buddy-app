@@ -123,6 +123,10 @@ export const guestMeetings = pgTable("guest_meetings", {
   scheduledAt: text("scheduled_at").notNull(),
   durationMinutes: integer("duration_minutes").notNull().default(60),
   usedFallback: integer("used_fallback").notNull().default(0),
+  meetingType: text("meeting_type").notNull().default("in_person"),
+  onlineMeetingUrl: text("online_meeting_url"),
+  zaloUserId: text("zalo_user_id"),
+  reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true, mode: "string" }),
   status: text("status").notNull().default("confirmed"),
   confirmationEmailSentAt: timestamp("confirmation_email_sent_at", {
     withTimezone: true,
@@ -134,12 +138,15 @@ export const guestMeetings = pgTable("guest_meetings", {
   updatedAt: auditTimestamp("updated_at"),
 });
 
-export const ptUnavailableDays = pgTable("pt_unavailable_days", {
+export const ptUnavailabilityBlocks = pgTable("pt_unavailability_blocks", {
   id: text("id").primaryKey(),
   ptId: text("pt_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   unavailableDate: text("unavailable_date").notNull(),
+  allDay: integer("all_day").notNull().default(1),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
   reason: text("reason"),
   createdAt: auditTimestamp("created_at"),
 });
@@ -335,6 +342,7 @@ export const ptProfiles = pgTable("pt_profiles", {
   specialtiesEn: text("specialties_en").notNull().default(""),
   specialtiesVi: text("specialties_vi").notNull().default(""),
   photoPath: text("photo_path"),
+  photoBase64: text("photo_base64"),
   yearsExperience: integer("years_experience").notNull().default(0),
   isPublic: integer("is_public").notNull().default(1),
   createdAt: auditTimestamp("created_at"),
@@ -463,6 +471,43 @@ export const crmNotes = pgTable("crm_notes", {
   note: text("note").notNull(),
   createdAt: auditTimestamp("created_at"),
 });
+
+export const feedComments = pgTable("feed_comments", {
+  id: text("id").primaryKey(),
+  postId: text("post_id")
+    .notNull()
+    .references(() => communityFeed.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  isAgent: integer("is_agent").notNull().default(0),
+  macrosJson: text("macros_json"),
+  createdAt: auditTimestamp("created_at"),
+});
+
+export const gymPhotos = pgTable("gym_photos", {
+  id: text("id").primaryKey(),
+  imageBase64: text("image_base64").notNull(),
+  caption: text("caption"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isPublic: integer("is_public").notNull().default(1),
+  createdAt: auditTimestamp("created_at"),
+  updatedAt: auditTimestamp("updated_at"),
+});
+
+export const dailyMotivation = pgTable(
+  "daily_motivation",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    forDate: text("for_date").notNull(),
+    message: text("message").notNull(),
+    createdAt: auditTimestamp("created_at"),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.forDate] })],
+);
 
 export const auditLogs = pgTable("audit_logs", {
   id: text("id").primaryKey(),

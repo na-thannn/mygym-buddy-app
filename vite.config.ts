@@ -5,6 +5,17 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { fileURLToPath } from "node:url";
 
+// Bind-mounted host files (Windows/macOS Docker) do not deliver inotify events
+// to the Linux container, so HMR needs polling there. Gated on the env var that
+// docker-compose sets so native local dev keeps using fast OS file events.
+const usePolling = Boolean(process.env.CHOKIDAR_USEPOLLING);
+
+// While polling, skip large non-source trees. Polling stat()s every watched
+// file, and scanning these over the slow host bind mount saturates the I/O
+// thread pool and stalls the first SSR compile.
+const watchIgnored =
+  /[\\/](?:\.git|node_modules|\.agents|graphify-out|\.cursor|\.codex|\.github|\.understand-anything|dist|docs|supabase)(?:[\\/]|$)/;
+
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
 // @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
 export default defineConfig({
@@ -16,6 +27,17 @@ export default defineConfig({
     // Keep Vite/TanStack from also loading .env, .env.local, or mode-specific env files.
     // @ts-expect-error The Lovable TanStack wrapper forwards this Vite runtime option.
     envFile: false,
+    ...(usePolling
+      ? {
+          server: {
+            watch: {
+              usePolling: true,
+              interval: 1000,
+              ignored: (path: string) => watchIgnored.test(path),
+            },
+          },
+        }
+      : {}),
     resolve: {
       alias: {
         // shim node:async_hooks in the browser to prevent Vite externalization runtime errors

@@ -37,9 +37,9 @@ function withoutUnsupportedPgMemTypes(config: unknown) {
 function wantsArrayRows(config: unknown) {
   return Boolean(
     config &&
-      typeof config === "object" &&
-      "rowMode" in config &&
-      (config as { rowMode?: unknown }).rowMode === "array",
+    typeof config === "object" &&
+    "rowMode" in config &&
+    (config as { rowMode?: unknown }).rowMode === "array",
   );
 }
 
@@ -76,9 +76,11 @@ function patchPgMemQueryTarget<T extends { query: (...args: unknown[]) => unknow
   return target;
 }
 
-function patchPgMemPool<T extends { connect: (...args: unknown[]) => Promise<unknown> } & {
-  query: (...args: unknown[]) => unknown;
-}>(pool: T): T {
+function patchPgMemPool<
+  T extends { connect: (...args: unknown[]) => Promise<unknown> } & {
+    query: (...args: unknown[]) => unknown;
+  },
+>(pool: T): T {
   patchPgMemQueryTarget(pool);
   const connect = pool.connect.bind(pool);
   pool.connect = (async (...args: unknown[]) => {
@@ -112,6 +114,9 @@ export async function resetDatabaseForTests() {
   await db.execute(sql`
     TRUNCATE TABLE
       audit_logs,
+      daily_motivation,
+      gym_photos,
+      feed_comments,
       manual_payments,
       memberships,
       purchase_requests,
@@ -133,7 +138,7 @@ export async function resetDatabaseForTests() {
       group_class_sessions,
       group_classes,
       support_tickets,
-      pt_unavailable_days,
+      pt_unavailability_blocks,
       guest_meetings,
       bookings,
       progress_reports,

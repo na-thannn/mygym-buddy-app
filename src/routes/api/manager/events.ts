@@ -9,7 +9,7 @@ import { newId } from "@/server/auth";
 const eventSchema = z.object({
   id: z.string().optional(),
   titleEn: z.string().trim().min(1).max(140),
-  titleVi: z.string().trim().min(1).max(140),
+  titleVi: z.string().trim().min(1).max(140).optional(),
   descriptionEn: z.string().max(1500).optional().default(""),
   descriptionVi: z.string().max(1500).optional().default(""),
   eventType: z.string().trim().min(1).max(80).default("class"),
@@ -44,6 +44,8 @@ export const Route = createFileRoute("/api/manager/events")({
         const values = {
           ...eventData,
           id,
+          titleVi: eventData.titleVi ?? eventData.titleEn,
+          descriptionVi: eventData.descriptionVi ?? eventData.descriptionEn,
           startsAt: eventData.startsAt ?? null,
           endsAt: eventData.endsAt ?? null,
           imagePath: eventData.imagePath ?? null,
@@ -55,6 +57,8 @@ export const Route = createFileRoute("/api/manager/events")({
             .update(schema.publicEvents)
             .set({
               ...eventData,
+              titleVi: values.titleVi,
+              descriptionVi: values.descriptionVi,
               startsAt: values.startsAt,
               endsAt: values.endsAt,
               imagePath: values.imagePath,

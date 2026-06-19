@@ -9,7 +9,7 @@ import { newId } from "@/server/auth";
 const packageSchema = z.object({
   id: z.string().optional(),
   nameEn: z.string().trim().min(1).max(120),
-  nameVi: z.string().trim().min(1).max(120),
+  nameVi: z.string().trim().min(1).max(120).optional(),
   descriptionEn: z.string().max(1000).optional().default(""),
   descriptionVi: z.string().max(1000).optional().default(""),
   audience: z.string().trim().min(1).max(80).default("general"),
@@ -41,11 +41,22 @@ export const Route = createFileRoute("/api/manager/packages")({
         if (!parsed.success) return json({ error: "Invalid input", details: parsed.error }, 400);
         const id = parsed.data.id || newId();
         const { id: _inputId, ...planData } = parsed.data;
-        const values = { ...planData, id, updatedAt: new Date().toISOString() };
+        const values = {
+          ...planData,
+          nameVi: planData.nameVi ?? planData.nameEn,
+          descriptionVi: planData.descriptionVi ?? planData.descriptionEn,
+          id,
+          updatedAt: new Date().toISOString(),
+        };
         if (parsed.data.id) {
           await db
             .update(schema.membershipPlans)
-            .set({ ...planData, updatedAt: values.updatedAt })
+            .set({
+              ...planData,
+              nameVi: values.nameVi,
+              descriptionVi: values.descriptionVi,
+              updatedAt: values.updatedAt,
+            })
             .where(eq(schema.membershipPlans.id, id));
         } else {
           await db.insert(schema.membershipPlans).values(values);
