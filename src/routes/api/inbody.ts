@@ -82,6 +82,11 @@ export const Route = createFileRoute("/api/inbody")({
               ? Number(String(bodyFatPercentVal))
               : undefined;
 
+        const imageBase64 =
+          typeof bodyObj?.imageBase64 === "string" ? (bodyObj.imageBase64 as string) : null;
+        const source =
+          bodyObj?.source === "scan" || imageBase64 ? ("scan" as const) : ("manual" as const);
+
         const id = newId();
         const createdAt = new Date().toISOString();
         try {
@@ -94,6 +99,8 @@ export const Route = createFileRoute("/api/inbody")({
               reportDate,
               muscleMassKg: Number(muscleMassKg) || 0,
               bodyFatPercent: Number(bodyFatPercent) || 0,
+              imageBase64,
+              source,
               createdAt,
             });
           return new Response(JSON.stringify({ ok: true, id }), {

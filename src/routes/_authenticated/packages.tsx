@@ -191,30 +191,38 @@ function PackagesPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => (
-          <section key={plan.id} className="rounded-2xl border border-white/10 bg-[#111612] p-5">
+          <section
+            key={plan.id}
+            className="flex h-full flex-col rounded-2xl border border-white/10 bg-[#111612] p-5"
+          >
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-xs uppercase tracking-[0.16em] text-primary">
+              <div className="min-w-0">
+                <div className="text-xs font-medium uppercase tracking-wide text-primary">
                   {plan.durationDays} days
                 </div>
-                <h2 className="mt-2 text-xl font-semibold text-slate-100">{plan.nameEn}</h2>
+                <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-100">
+                  {plan.nameEn}
+                </h2>
               </div>
-              <CreditCard className="size-5 text-primary" strokeWidth={1.8} />
+              <CreditCard className="size-5 shrink-0 text-primary" strokeWidth={1.8} />
             </div>
-            <div className="mt-4 text-2xl font-semibold text-slate-50">
+            <div className="mt-4 text-xl font-semibold tracking-tight tabular-nums text-slate-50">
               {formatVnd(plan.priceVnd)}
             </div>
-            <p className="mt-2 min-h-12 text-sm leading-6 text-slate-300">{plan.descriptionEn}</p>
-            {plan.includesPtSessions > 0 && (
-              <div className="mt-3 text-xs text-primary">{plan.includesPtSessions} PT sessions</div>
-            )}
-            <Button
-              className="mt-5 w-full"
-              disabled={busyId === plan.id}
-              onClick={() => requestPlan(plan.id)}
-            >
-              Request package <ArrowRight className="ml-2 size-4" strokeWidth={1.8} />
-            </Button>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">{plan.descriptionEn}</p>
+            <div className="mt-3 min-h-5 text-xs font-medium text-primary">
+              {plan.includesPtSessions > 0 ? `${plan.includesPtSessions} PT sessions` : null}
+            </div>
+            <div className="mt-auto pt-5">
+              <Button
+                className="h-10 w-full"
+                disabled={busyId === plan.id}
+                onClick={() => requestPlan(plan.id)}
+              >
+                Request package
+                <ArrowRight className="size-4" strokeWidth={1.8} />
+              </Button>
+            </div>
           </section>
         ))}
       </div>
@@ -226,25 +234,30 @@ function PackagesPage() {
             {services.map((service) => (
               <section
                 key={service.id}
-                className="rounded-2xl border border-white/10 bg-[#111612] p-5"
+                className="flex h-full flex-col rounded-2xl border border-white/10 bg-[#111612] p-5"
               >
-                <div className="text-xs uppercase tracking-[0.16em] text-primary">
+                <div className="text-xs font-medium uppercase tracking-wide text-primary">
                   {service.category} / {service.durationMinutes} min
                 </div>
-                <h3 className="mt-2 text-xl font-semibold text-slate-100">{service.nameEn}</h3>
-                <div className="mt-4 text-2xl font-semibold text-slate-50">
+                <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-100">
+                  {service.nameEn}
+                </h3>
+                <div className="mt-4 text-xl font-semibold tracking-tight tabular-nums text-slate-50">
                   {formatVnd(service.priceVnd)}
                 </div>
-                <p className="mt-2 min-h-12 text-sm leading-6 text-slate-300">
+                <p className="mt-2 text-sm leading-relaxed text-slate-300">
                   {service.descriptionEn}
                 </p>
-                <Button
-                  className="mt-5 w-full"
-                  disabled={busyId === service.id}
-                  onClick={() => requestService(service.id)}
-                >
-                  Request service <ArrowRight className="ml-2 size-4" strokeWidth={1.8} />
-                </Button>
+                <div className="mt-auto pt-5">
+                  <Button
+                    className="h-10 w-full"
+                    disabled={busyId === service.id}
+                    onClick={() => requestService(service.id)}
+                  >
+                    Request service
+                    <ArrowRight className="size-4" strokeWidth={1.8} />
+                  </Button>
+                </div>
               </section>
             ))}
           </div>

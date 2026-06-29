@@ -1,5 +1,8 @@
 import type { UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useCleanDatabase } from "@/test/use-clean-database";
+
+useCleanDatabase();
 
 beforeEach(() => {
   vi.resetModules();

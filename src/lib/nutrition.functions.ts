@@ -3,7 +3,7 @@ import logDevError from "@/lib/error-logger";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { generateObject } from "ai";
-import { getGroq, FAST_MODEL_ID, ALEX_VISION_MODEL_ID } from "./trainer/groq";
+import { ALEX_VISION_MODEL_ID, FAST_MODEL_ID, getModelProvider } from "./trainer/groq";
 
 async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
@@ -46,8 +46,8 @@ export async function estimateMacrosForMeals(meals: {
   preWorkoutMeal?: string | null;
   postWorkoutMeal?: string | null;
 }) {
-  const groq = getGroq();
-  const prompt = `Estimate total daily macros from the meals below. Return ONLY numbers in grams and kcal.
+  const provider = getModelProvider();
+  const prompt = `Estimate total daily macros from the meals below. Respond with a JSON object containing calories (kcal), protein_g, carbs_g, and fats_g as numbers.
 Breakfast: ${meals.breakfast || "(none)"}
 Lunch: ${meals.lunch || "(none)"}
 Dinner: ${meals.dinner || "(none)"}
@@ -55,7 +55,7 @@ Snacks: ${meals.snacks || "(none)"}
 Pre-workout: ${meals.preWorkoutMeal || "(none)"}
 Post-workout: ${meals.postWorkoutMeal || "(none)"}`;
   const { object } = await generateObject({
-    model: groq(FAST_MODEL_ID),
+    model: provider(FAST_MODEL_ID),
     schema: macrosSchema,
     prompt,
   });
@@ -74,16 +74,16 @@ const mealVisionSchema = z.object({
 // Uses a multimodal model; the OpenAI-compatible provider forwards the data
 // URL as an image_url part.
 export async function estimateMealFromImage(input: { imageDataUrl: string; note?: string | null }) {
-  const groq = getGroq();
+  const provider = getModelProvider();
   const promptText = [
     "You are a nutrition assistant. Identify the meal in this photo and estimate the macros for the portion shown.",
     input.note ? `The member also wrote: "${input.note}".` : "",
-    "Return a short meal name plus totals in grams and kcal.",
+    "Return a JSON object with name (short meal label), calories (kcal), protein_g, carbs_g, and fats_g as numbers.",
   ]
     .filter(Boolean)
     .join(" ");
   const { object } = await generateObject({
-    model: groq(ALEX_VISION_MODEL_ID),
+    model: provider(ALEX_VISION_MODEL_ID),
     schema: mealVisionSchema,
     messages: [
       {

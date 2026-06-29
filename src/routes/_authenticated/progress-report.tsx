@@ -161,7 +161,7 @@ function ProgressReport() {
           <Button
             asChild
             variant="outline"
-            className="w-full border-white/10 text-slate-200 hover:text-primary sm:w-auto"
+            className="w-full border-white/15 bg-white/[0.05] text-slate-100 hover:border-primary/30 hover:bg-primary/10 hover:text-primary sm:w-auto"
           >
             <a href={`/trainer?prompt=${encodeURIComponent(alexReportPrompt)}`}>
               Ask Alex

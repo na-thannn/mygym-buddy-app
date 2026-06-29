@@ -52,8 +52,9 @@ const toolsMock = vi.hoisted(() => ({
   buildAlexTools: vi.fn(),
 }));
 
-const groqMock = vi.hoisted(() => ({
-  getGroq: vi.fn(),
+const providerMock = vi.hoisted(() => ({
+  getModelProvider: vi.fn(),
+  isAiConfigured: vi.fn(),
 }));
 
 const aiMock = vi.hoisted(() => ({
@@ -73,8 +74,9 @@ vi.mock("@/lib/trainer/context", () => contextMock);
 vi.mock("@/lib/trainer/prompts", () => promptMock);
 vi.mock("@/lib/trainer/tools", () => toolsMock);
 vi.mock("@/lib/trainer/groq", () => ({
-  ...groqMock,
+  ...providerMock,
   ALEX_MODEL_ID: "test-chat-model",
+  AI_NOT_CONFIGURED_MESSAGE: "AI provider is not configured.",
 }));
 vi.mock("ai", () => aiMock);
 
@@ -103,7 +105,8 @@ describe("chat API handler", () => {
       "Alex prompt\nMember context:\n- Goal: Build strength",
     );
     toolsMock.buildAlexTools.mockReturnValue({});
-    groqMock.getGroq.mockReturnValue((modelId: string) => ({ modelId }));
+    providerMock.isAiConfigured.mockReturnValue(true);
+    providerMock.getModelProvider.mockReturnValue((modelId: string) => ({ modelId }));
     aiMock.validateUIMessages.mockResolvedValue([...previousMessages, latestMessage]);
     aiMock.convertToModelMessages.mockResolvedValue("model messages");
     aiMock.stepCountIs.mockReturnValue("stop condition");

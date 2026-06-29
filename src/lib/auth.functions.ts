@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import logDevError from "@/lib/error-logger";
 import { authEmailSchema } from "@/lib/auth-input";
 import { canUsePublicSignup, PUBLIC_SIGNUP_DISABLED_ERROR } from "@/lib/signup-policy";
+import { HL_FITNESS_GYM_ACCESS } from "@/lib/trainer/hl-fitness-layout";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
@@ -47,7 +48,7 @@ export const signUp = createServerFn({ method: "POST" })
           role: adminExists ? "customer" : "admin",
           mustChangePassword: 0,
         });
-      await db.insert(schema.profiles).values({ userId: id });
+      await db.insert(schema.profiles).values({ userId: id, equipment: HL_FITNESS_GYM_ACCESS });
       const { token, expiresAt } = await createSession(id);
       setSessionCookie(token, expiresAt);
       return { id, email: data.email, displayName: data.displayName };

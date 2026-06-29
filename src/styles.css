@@ -104,8 +104,8 @@
   --secondary-foreground: oklch(0.94 0.006 95);
   --muted: oklch(0.24 0.012 150);
   --muted-foreground: oklch(0.72 0.01 95);
-  --accent: oklch(0.68 0.095 82);
-  --accent-foreground: oklch(0.13 0.012 150);
+  --accent: oklch(0.28 0.02 150);
+  --accent-foreground: oklch(0.96 0.006 95);
   --destructive: oklch(0.66 0.21 25);
   --destructive-foreground: oklch(0.98 0.003 95);
   --border: oklch(1 0 0 / 11%);
@@ -661,4 +661,24 @@
   .kinetic-cta svg:last-child {
     transform: none !important;
   }
+}
+
+.prose-invert :where(table) {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.prose-invert :where(th, td) {
+  min-width: 4.5rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid color-mix(in oklch, var(--foreground) 12%, transparent);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.prose-invert :where(thead th) {
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  font-weight: 600;
 }

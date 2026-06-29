@@ -22,6 +22,20 @@
       "when": 1781679692376,
       "tag": "0002_curious_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782000000000,
+      "tag": "0003_profile_training_prefs",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782100000000,
+      "tag": "0004_feed_likes_inbody_scan",
+      "breakpoints": true
     }
   ]
 }

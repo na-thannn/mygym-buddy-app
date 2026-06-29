@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { getTrainerPromptFromSearch } from "@/lib/customer-experience";
 import { toast } from "sonner";
+import { stripLeakedToolSyntax } from "@/lib/trainer/message-sanitize";
 
 export const Route = createFileRoute("/_authenticated/trainer")({
   head: () => ({ meta: [{ title: "AI Coach - HL Fitness" }] }),
@@ -548,23 +549,27 @@ type AnyMessage = ReturnType<typeof useChat>["messages"][number];
 function MessageBubble({ message }: { message: AnyMessage }) {
   const isUser = message.role === "user";
   return (
-    <div className={cn("flex flex-col gap-2", isUser ? "items-end" : "items-start")}>
+    <div className={cn("flex min-w-0 w-full flex-col gap-2", isUser ? "items-end" : "items-start")}>
       {message.parts.map((part, i) => {
         if (part.type === "text") {
+          const text = isUser ? (part.text ?? "") : stripLeakedToolSyntax(part.text ?? "");
+          if (!text.trim()) return null;
           return (
             <div
               key={i}
               className={cn(
-                "rounded-2xl px-4 py-2.5 max-w-[85%] text-sm animate-fade-up",
+                "rounded-2xl px-4 py-2.5 max-w-[85%] min-w-0 text-sm animate-fade-up",
                 isUser
                   ? "bg-primary text-primary-foreground"
                   : "bg-white/10 text-slate-100 prose prose-sm prose-invert max-w-[85%]",
               )}
             >
               {isUser ? (
-                part.text
+                text
               ) : (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
+                <div className="max-w-full overflow-x-auto">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                </div>
               )}
             </div>
           );
@@ -597,39 +602,77 @@ function ToolPart({ part }: { part: ToolPartShape }) {
     "output-available": "done",
     "output-error": "failed",
   };
+  const displayOutput = formatToolOutput(toolName, part.output);
   return (
-    <div className="w-full max-w-[85%] rounded-lg border border-white/10 bg-[#111612] text-xs">
+    <div className="w-full min-w-0 max-w-[85%] overflow-hidden rounded-lg border border-white/10 bg-[#111612] text-xs">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
       >
-        {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-        <Wrench className="size-3 text-primary" />
+        {open ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
+        <Wrench className="size-3 shrink-0 text-primary" />
         <span className="font-medium">{label}</span>
-        <span className="text-slate-400 ml-auto">{statusLabel[state] ?? state}</span>
+        <span className="ml-auto text-slate-400">{statusLabel[state] ?? state}</span>
       </button>
       {open && (
-        <div className="px-3 pb-2 space-y-2 border-t border-white/10 pt-2">
+        <div className="space-y-2 border-t border-white/10 px-3 pb-2 pt-2">
           {part.input !== undefined && (
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 mb-1">Input</div>
-              <pre className="bg-white/[0.05] rounded p-2 overflow-x-auto text-[11px]">
+            <div className="min-w-0">
+              <div className="mb-1 text-[10px] uppercase text-slate-400">Input</div>
+              <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded bg-white/[0.05] p-2 text-[11px] text-slate-200">
                 {JSON.stringify(part.input, null, 2)}
               </pre>
             </div>
           )}
-          {part.output !== undefined && (
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 mb-1">Output</div>
-              <pre className="bg-white/[0.05] rounded p-2 overflow-x-auto text-[11px]">
-                {JSON.stringify(part.output, null, 2)}
-              </pre>
+          {displayOutput !== null && (
+            <div className="min-w-0">
+              <div className="mb-1 text-[10px] uppercase text-slate-400">Output</div>
+              {typeof displayOutput === "string" ? (
+                <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded bg-white/[0.05] p-2 text-[11px] text-slate-200">
+                  {displayOutput}
+                </pre>
+              ) : (
+                displayOutput
+              )}
             </div>
           )}
-          {part.errorText && <div className="text-red-300 text-[11px]">{part.errorText}</div>}
+          {part.errorText && <div className="text-[11px] text-red-300">{part.errorText}</div>}
         </div>
       )}
+    </div>
+  );
+}
+
+function formatToolOutput(toolName: string, output: unknown): string | ReactNode | null {
+  if (output === undefined) return null;
+  if (toolName !== "generate_workout_plan" || !output || typeof output !== "object") {
+    return JSON.stringify(output, null, 2);
+  }
+
+  const payload = output as {
+    ok?: boolean;
+    title?: string;
+    planDate?: string;
+    daysPerWeek?: string;
+    equipment?: string;
+    contentMd?: string;
+    savedToPlans?: boolean;
+  };
+
+  if (!payload.ok || !payload.contentMd) {
+    return JSON.stringify(output, null, 2);
+  }
+
+  return (
+  <div className="space-y-2">
+      <div className="rounded bg-white/[0.05] p-2 text-[11px] text-slate-300">
+        Saved <span className="text-primary">{payload.title ?? "workout plan"}</span>
+        {payload.planDate ? ` for ${payload.planDate}` : ""}. Open Plans to review the full library.
+      </div>
+      <div className="max-h-72 overflow-y-auto overflow-x-hidden rounded border border-white/10 bg-black/20 p-2 prose prose-sm max-w-none prose-invert prose-table:block prose-table:overflow-x-auto">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{payload.contentMd}</ReactMarkdown>
+      </div>
     </div>
   );
 }

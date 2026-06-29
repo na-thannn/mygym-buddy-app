@@ -963,6 +963,7 @@ function Landing() {
                             : `/photos/${photo}`
                         }
                         alt={`HL Fitness facility view ${i + 1}`}
+                        draggable={false}
                         className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.045]"
                       />
                       <div className="absolute bottom-3 left-3 z-20 rounded-xl border border-white/10 bg-[#080b0a]/70 px-3 py-2 text-xs font-semibold text-stone-200 backdrop-blur">

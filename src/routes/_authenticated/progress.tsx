@@ -278,7 +278,7 @@ function Progress() {
               <Button
                 variant="outline"
                 onClick={handleUploadClick}
-                className="rounded-xl border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]"
+                className="rounded-xl border-white/15 bg-white/[0.05] text-slate-100 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
               >
                 <ImagePlus className="mr-2 size-4" />
                 Add photo

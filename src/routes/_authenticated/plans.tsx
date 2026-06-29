@@ -13,11 +13,13 @@ import {
   ChevronRight,
   ChevronUp,
   ClipboardList,
+  Download,
   Loader2,
   Sparkles,
 } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { selectActivePlan } from "@/lib/customer-experience";
+import { downloadMarkdown, sanitizeMarkdownFilename } from "@/lib/download-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -41,6 +43,10 @@ const EMPTY: FormState = {
 
 const alexPlanPrompt =
   "Generate my next training plan using my profile, recent workouts, InBody reports, and limitations.";
+
+function planDownloadName(plan: Row) {
+  return sanitizeMarkdownFilename(`${plan.title || "plan"}-${plan.planDate}`);
+}
 
 function PlansPage() {
   const list = useCallback(async () => {
@@ -111,10 +117,6 @@ function PlansPage() {
     () => selectActivePlan({ today: new Date().toISOString().slice(0, 10), plans: rows }),
     [rows],
   );
-
-  useEffect(() => {
-    if (!open && activePlan) setOpen(activePlan.id);
-  }, [activePlan, open]);
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -252,7 +254,7 @@ Day 2 - Lower
                 type="button"
                 variant="outline"
                 disabled={feedbackBusy}
-                className="w-full border-white/10 text-slate-200 hover:text-primary sm:w-auto"
+                className="w-full border-white/15 bg-white/[0.05] text-slate-100 hover:border-primary/30 hover:bg-primary/10 hover:text-primary sm:w-auto"
                 onClick={handleFeedback}
               >
                 {feedbackBusy ? (
@@ -332,7 +334,7 @@ function ActivePlanCard({ activePlan }: { activePlan: Row | null }) {
       <Button
         asChild
         variant="outline"
-        className="mt-5 w-full border-white/10 text-slate-200 hover:text-primary"
+        className="mt-5 w-full border-white/15 bg-white/[0.05] text-slate-100 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
       >
         <a
           href={`/trainer?prompt=${encodeURIComponent(
@@ -345,6 +347,17 @@ function ActivePlanCard({ activePlan }: { activePlan: Row | null }) {
           <ChevronRight className="ml-2 size-4" />
         </a>
       </Button>
+      {activePlan && (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3 w-full border-white/15 bg-white/[0.05] text-slate-100 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+          onClick={() => downloadMarkdown(planDownloadName(activePlan), activePlan.contentMd)}
+        >
+          <Download className="mr-2 size-4" />
+          Download .md
+        </Button>
+      )}
     </div>
   );
 }
@@ -412,7 +425,7 @@ function SavedPlansPanel({
             return (
               <div
                 key={r.id}
-                className={`rounded-2xl border bg-white/[0.05] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/10 ${
+                className={`min-w-0 overflow-hidden rounded-2xl border bg-white/[0.05] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/10 ${
                   isActive ? "border-primary/40" : "border-white/10"
                 }`}
               >
@@ -433,23 +446,47 @@ function SavedPlansPanel({
                       )}
                     </div>
                     <div className="mt-1 text-xs text-slate-400">{formatDate(r.planDate)}</div>
-                    <div className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
-                      {summarizePlan(r.contentMd)}
-                    </div>
+                    {!isOpen && (
+                      <div className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+                        {summarizePlan(r.contentMd)}
+                      </div>
+                    )}
                   </button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="shrink-0 text-slate-300"
+                    className="shrink-0 self-start text-slate-300"
                     onClick={() => setOpen(isOpen ? null : r.id)}
                   >
                     {isOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
                   </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 self-start border-white/15 bg-white/[0.05] text-slate-200 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                    aria-label="Download plan"
+                    onClick={() => downloadMarkdown(planDownloadName(r), r.contentMd)}
+                  >
+                    <Download className="size-4" />
+                  </Button>
                 </div>
                 {isOpen && (
-                  <div className="border-t border-white/10 p-4 prose prose-sm max-w-none prose-invert">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{r.contentMd}</ReactMarkdown>
+                  <div className="min-w-0 border-t border-white/10 p-4">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mb-3 border-white/15 bg-white/[0.05] text-slate-100 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                      onClick={() => downloadMarkdown(planDownloadName(r), r.contentMd)}
+                    >
+                      <Download className="mr-2 size-4" />
+                      Download .md
+                    </Button>
+                    <div className="prose prose-sm max-w-none prose-invert prose-table:block overflow-x-auto">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{r.contentMd}</ReactMarkdown>
+                    </div>
                   </div>
                 )}
               </div>

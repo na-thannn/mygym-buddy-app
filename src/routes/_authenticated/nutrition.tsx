@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Apple, ChevronRight, Flame, Loader2, RotateCcw, Sparkles, Utensils } from "lucide-react";
+import {
+  Apple,
+  ChevronRight,
+  Flame,
+  Image as ImageIcon,
+  Loader2,
+  RotateCcw,
+  Sparkles,
+  Utensils,
+  X,
+} from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { buildNutritionExperience } from "@/lib/customer-experience";
+import { compressImageFile } from "@/lib/image-compress";
+import { normalizeMealMacros } from "@/lib/meal-macros";
+import {
+  clearNutritionFeedDraft,
+  readNutritionFeedDraft,
+  suggestedBucketToSlot,
+  type MealSlot,
+  type NutritionFeedDraft,
+} from "@/lib/nutrition-feed-draft";
 import type { listNutritionReports } from "@/lib/nutrition.functions";
 
 export const Route = createFileRoute("/_authenticated/nutrition")({
@@ -111,12 +130,27 @@ const MEAL_FIELDS = [
 const alexNutritionPrompt =
   "Build a simple meal plan for this week using my recent nutrition logs and training goal.";
 
+type PhotoMealAnalysis = {
+  mealName: string;
+  macros: NutritionFeedDraft["macros"];
+  suggestedBucket?: string;
+};
+
 function Nutrition() {
   const [rows, setRows] = useState<Row[]>([]);
   const [f, setF] = useState<FormState>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [feedDraft, setFeedDraft] = useState<NutritionFeedDraft | null>(null);
+  const [feedMealSlot, setFeedMealSlot] = useState<MealSlot | "">("");
+  const [photoDraft, setPhotoDraft] = useState<string | null>(null);
+  const [photoNote, setPhotoNote] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [photoAnalysis, setPhotoAnalysis] = useState<PhotoMealAnalysis | null>(null);
+  const [photoMealSlot, setPhotoMealSlot] = useState<MealSlot | "">("");
+  const photoFileRef = useRef<HTMLInputElement | null>(null);
 
   const list = useCallback(async () => {
     const res = await fetch("/api/log/nutrition-report", { credentials: "include" });
@@ -158,6 +192,134 @@ function Nutrition() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const draft = readNutritionFeedDraft();
+    if (!draft) return;
+    clearNutritionFeedDraft();
+    setFeedDraft(draft);
+    const suggested = suggestedBucketToSlot(draft.suggestedBucket);
+    if (suggested) setFeedMealSlot(suggested);
+    setF((current) => {
+      const next = {
+        ...current,
+        reportDate: draft.reportDate || current.reportDate,
+        estimateMacros: false,
+        calories: draft.macros ? String(Math.round(draft.macros.calories)) : "",
+        proteinG: draft.macros ? String(Math.round(draft.macros.proteinG)) : "",
+        carbsG: draft.macros ? String(Math.round(draft.macros.carbsG)) : "",
+        fatsG: draft.macros ? String(Math.round(draft.macros.fatsG)) : "",
+      };
+      if (suggested) {
+        next[suggested] = draft.mealName;
+      }
+      return next;
+    });
+  }, []);
+
+  const applyFeedMealSlot = (slot: MealSlot) => {
+    if (!feedDraft) return;
+    setFeedMealSlot(slot);
+    setF((current) => ({
+      ...current,
+      [slot]: current[slot] ? `${current[slot]}; ${feedDraft.mealName}` : feedDraft.mealName,
+    }));
+  };
+
+  const applyMealAnalysisToForm = (
+    analysis: PhotoMealAnalysis,
+    slot: MealSlot | "" | null | undefined,
+  ) => {
+    const resolvedSlot = slot || suggestedBucketToSlot(analysis.suggestedBucket);
+    setF((current) => {
+      const next: FormState = {
+        ...current,
+        estimateMacros: analysis.macros ? false : current.estimateMacros,
+        calories: analysis.macros ? String(Math.round(analysis.macros.calories)) : current.calories,
+        proteinG: analysis.macros ? String(Math.round(analysis.macros.proteinG)) : current.proteinG,
+        carbsG: analysis.macros ? String(Math.round(analysis.macros.carbsG)) : current.carbsG,
+        fatsG: analysis.macros ? String(Math.round(analysis.macros.fatsG)) : current.fatsG,
+      };
+      if (resolvedSlot) {
+        next[resolvedSlot] = analysis.mealName;
+      }
+      return next;
+    });
+    if (resolvedSlot) {
+      setPhotoMealSlot(resolvedSlot);
+    }
+  };
+
+  const attachPhoto = async (file: File) => {
+    setImageBusy(true);
+    try {
+      const base64 = await compressImageFile(file);
+      setPhotoDraft(base64);
+      setPhotoAnalysis(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not process image");
+    } finally {
+      setImageBusy(false);
+    }
+  };
+
+  const analysePhotoMeal = async () => {
+    const note = photoNote.trim();
+    if (!photoDraft && !note) {
+      toast.error("Add a photo or meal description first");
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const res = await fetch("/api/nutrition/analyse-meal", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: photoDraft,
+          note: note || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Could not analyse meal");
+      const macros = normalizeMealMacros(data.macros);
+      const analysis: PhotoMealAnalysis = {
+        mealName: typeof data.mealName === "string" ? data.mealName : note || "Meal",
+        macros,
+        suggestedBucket:
+          typeof data.suggestedBucket === "string" ? data.suggestedBucket : undefined,
+      };
+      setPhotoAnalysis(analysis);
+      applyMealAnalysisToForm(analysis, suggestedBucketToSlot(analysis.suggestedBucket));
+      if (macros) {
+        toast.success(`Estimated ~${Math.round(macros.calories)} kcal`);
+      } else if (data.aiConfigured === false) {
+        toast.error("AI is not configured. Set GROQ_API_KEY to estimate macros.");
+      } else {
+        toast.message("Meal identified, but macros could not be estimated.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not analyse meal");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const applyPhotoMealSlot = (slot: MealSlot) => {
+    if (!photoAnalysis) return;
+    setPhotoMealSlot(slot);
+    setF((current) => ({
+      ...current,
+      [slot]: photoAnalysis.mealName,
+    }));
+  };
+
+  const resetPhotoDraft = () => {
+    setPhotoDraft(null);
+    setPhotoNote("");
+    setPhotoAnalysis(null);
+    setPhotoMealSlot("");
+  };
 
   const summary = useMemo(
     () =>
@@ -214,6 +376,21 @@ function Nutrition() {
         },
       });
       toast.success(r.macros?.calories ? `Saved: ~${r.macros.calories} kcal` : "Report saved");
+      if (feedDraft?.postId) {
+        fetch("/api/feed/confirm-meal-log", {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            postId: feedDraft.postId,
+            mealName: feedDraft.mealName,
+            macros: feedDraft.macros,
+          }),
+        }).catch(() => {});
+      }
+      setFeedDraft(null);
+      setFeedMealSlot("");
+      resetPhotoDraft();
       setF({ ...EMPTY, reportDate: new Date().toISOString().slice(0, 10) });
       load();
     } catch (err) {
@@ -260,6 +437,185 @@ function Nutrition() {
               </div>
               <div className="grid size-12 place-items-center rounded-2xl bg-primary/15 text-primary">
                 <Utensils className="size-5" />
+              </div>
+            </div>
+
+            {feedDraft && (
+              <div className="mb-5 rounded-2xl border border-primary/30 bg-primary/[0.08] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <Sparkles className="size-4" />
+                  From your feed post
+                </div>
+                <p className="mt-2 text-sm text-slate-300">
+                  Choose which meal slot to log{" "}
+                  <span className="font-medium text-slate-100">{feedDraft.mealName}</span> under,
+                  then save when ready.
+                </p>
+                {feedDraft.macros && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                    <FeedDraftMacro label="Calories" value={`${Math.round(feedDraft.macros.calories)} kcal`} />
+                    <FeedDraftMacro label="Protein" value={`${Math.round(feedDraft.macros.proteinG)} g`} />
+                    <FeedDraftMacro label="Carbs" value={`${Math.round(feedDraft.macros.carbsG)} g`} />
+                    <FeedDraftMacro label="Fat" value={`${Math.round(feedDraft.macros.fatsG)} g`} />
+                  </div>
+                )}
+                <div className="mt-3 max-w-xs">
+                  <Label className="text-slate-300">Meal slot</Label>
+                  <Select
+                    value={feedMealSlot || undefined}
+                    onValueChange={(v) => applyFeedMealSlot(v as MealSlot)}
+                  >
+                    <SelectTrigger className="mt-1 border-white/10 bg-black/30">
+                      <SelectValue placeholder="Pick breakfast, lunch, dinner..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MEAL_FIELDS.map((field) => (
+                        <SelectItem key={field.key} value={field.key}>
+                          {field.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+                    <ImageIcon className="size-4 text-primary" />
+                    Estimate from photo
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    Upload a meal photo and optional caption.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <Textarea
+                  rows={2}
+                  value={photoNote}
+                  onChange={(e) => setPhotoNote(e.target.value)}
+                  placeholder="Optional caption, e.g. full English breakfast"
+                  className="border-white/10 bg-black/30"
+                />
+
+                {photoDraft && (
+                  <div className="relative inline-block max-w-full">
+                    <img
+                      src={photoDraft}
+                      alt="Meal preview"
+                      className="max-h-48 rounded-xl border border-white/10 object-cover"
+                    />
+                    <button
+                      type="button"
+                      aria-label="Remove photo"
+                      onClick={() => {
+                        setPhotoDraft(null);
+                        setPhotoAnalysis(null);
+                      }}
+                      className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-black/70 text-slate-200 hover:bg-black/90"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    ref={photoFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) await attachPhoto(file);
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={imageBusy}
+                    className="border-white/10 text-slate-200 hover:border-primary/30 hover:text-primary"
+                    onClick={() => photoFileRef.current?.click()}
+                  >
+                    {imageBusy ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <ImageIcon className="mr-2 size-4" />
+                    )}
+                    {photoDraft ? "Change photo" : "Add photo"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={photoBusy || imageBusy || (!photoDraft && !photoNote.trim())}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    onClick={analysePhotoMeal}
+                  >
+                    {photoBusy ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 size-4" />
+                    )}
+                    Estimate meal
+                  </Button>
+                </div>
+
+                {photoAnalysis && (
+                  <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-3">
+                    <div className="text-sm text-slate-200">
+                      Alex estimated{" "}
+                      <span className="font-medium text-slate-50">{photoAnalysis.mealName}</span>
+                    </div>
+                    {photoAnalysis.macros ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                        <FeedDraftMacro
+                          label="Calories"
+                          value={`${Math.round(photoAnalysis.macros.calories)} kcal`}
+                        />
+                        <FeedDraftMacro
+                          label="Protein"
+                          value={`${Math.round(photoAnalysis.macros.proteinG)} g`}
+                        />
+                        <FeedDraftMacro
+                          label="Carbs"
+                          value={`${Math.round(photoAnalysis.macros.carbsG)} g`}
+                        />
+                        <FeedDraftMacro
+                          label="Fat"
+                          value={`${Math.round(photoAnalysis.macros.fatsG)} g`}
+                        />
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                        Macros could not be estimated automatically. You can enter totals below.
+                      </p>
+                    )}
+                    <div className="mt-3 max-w-xs">
+                      <Label className="text-slate-300">Meal slot</Label>
+                      <Select
+                        value={photoMealSlot || undefined}
+                        onValueChange={(v) => applyPhotoMealSlot(v as MealSlot)}
+                      >
+                        <SelectTrigger className="mt-1 border-white/10 bg-black/30">
+                          <SelectValue placeholder="Pick breakfast, lunch, dinner..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MEAL_FIELDS.map((field) => (
+                            <SelectItem key={field.key} value={field.key}>
+                              {field.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -388,9 +744,10 @@ function Nutrition() {
                 type="button"
                 variant="ghost"
                 className="w-full text-slate-300 hover:text-slate-100 sm:w-auto"
-                onClick={() =>
-                  setF({ ...EMPTY, reportDate: new Date().toISOString().slice(0, 10) })
-                }
+                onClick={() => {
+                  resetPhotoDraft();
+                  setF({ ...EMPTY, reportDate: new Date().toISOString().slice(0, 10) });
+                }}
               >
                 <RotateCcw className="mr-2 size-4" />
                 Reset
@@ -471,6 +828,15 @@ function Nutrition() {
           </div>
         </aside>
       </div>
+    </div>
+  );
+}
+
+function FeedDraftMacro({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+      <div className="text-[11px] text-slate-400">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-100">{value}</div>
     </div>
   );
 }

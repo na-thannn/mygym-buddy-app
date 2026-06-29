@@ -5,6 +5,7 @@ import { db, schema } from "@/server/db";
 import { parseRequestBody } from "@/lib/request-utils";
 import logDevError from "@/lib/error-logger";
 import { estimateMacrosForMeals, estimateMealFromImage } from "@/lib/nutrition.functions";
+import { isAiConfigured } from "@/lib/trainer/groq";
 import { bucketMealByHour, saigonParts, type MealBucket } from "@/lib/time";
 import type { MaybeWrappedRequest } from "@/types/dev";
 
@@ -76,7 +77,7 @@ export const Route = createFileRoute("/api/feed/log-meal")({
           let mealName = text ? text.slice(0, 120) : "Meal";
           let macros: MacroTotals | null = null;
 
-          if (process.env.GROQ_API_KEY) {
+          if (isAiConfigured()) {
             try {
               if (image) {
                 const result = await estimateMealFromImage({

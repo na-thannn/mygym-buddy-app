@@ -1,24 +1,59 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
   Dumbbell,
+  Flag,
   Flame,
+  Heart,
   Image as ImageIcon,
   Loader2,
   MessageCircle,
   MoreHorizontal,
+  Pencil,
   Scale,
   Sparkles,
+  Trash2,
   User,
   Utensils,
+  X,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/authContext";
+import { compressImageFile } from "@/lib/image-compress";
+import { normalizeMealMacros } from "@/lib/meal-macros";
+import {
+  writeNutritionFeedDraft,
+  type NutritionFeedDraft,
+} from "@/lib/nutrition-feed-draft";
 import {
   buildTodayChecklist,
   buildWeeklyStreak,
@@ -41,6 +76,7 @@ type Post = {
   content: string;
   imageBase64?: string | null;
   likesCount?: number;
+  likedByMe?: boolean;
   createdAt: string;
 };
 
@@ -109,10 +145,20 @@ const CHECKLIST_ICONS = {
   inbody: Scale,
 } satisfies Record<TodayChecklistItem["id"], typeof Dumbbell>;
 
+type MealPrompt = {
+  mealName: string;
+  macros: NutritionFeedDraft["macros"];
+  suggestedBucket?: string;
+  fading?: boolean;
+};
+
 function Feed() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState("");
+  const [draftImage, setDraftImage] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [todayBusy, setTodayBusy] = useState(false);
   const [todayData, setTodayData] = useState<TodayData>(EMPTY_TODAY);
@@ -122,6 +168,17 @@ function Feed() {
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [commentBusy, setCommentBusy] = useState<string | null>(null);
   const [mealBusy, setMealBusy] = useState<string | null>(null);
+  const [mealPrompts, setMealPrompts] = useState<Record<string, MealPrompt>>({});
+  const [likeBusy, setLikeBusy] = useState<string | null>(null);
+  const [editPost, setEditPost] = useState<Post | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+  const [deletePost, setDeletePost] = useState<Post | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [reportPost, setReportPost] = useState<Post | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const isCustomer = user?.role === "customer";
@@ -252,24 +309,168 @@ function Feed() {
     }
   };
 
-  const logMeal = async (postId: string) => {
+  const analyseMeal = async (postId: string) => {
     if (mealBusy) return;
     setMealBusy(postId);
     try {
-      const res = await fetch("/api/feed/log-meal", {
+      const res = await fetch("/api/feed/analyse-meal", {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ postId }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Could not log meal");
-      await loadComments();
-      toast.success(data?.bucket ? `Logged to ${data.bucket}` : "Meal logged to your nutrition");
+      if (!res.ok) throw new Error(data?.error ?? "Could not analyse meal");
+      const macros = normalizeMealMacros(data.macros);
+      setMealPrompts((prev) => ({
+        ...prev,
+        [postId]: {
+          mealName: data.mealName as string,
+          macros,
+          suggestedBucket:
+            typeof data.suggestedBucket === "string" ? data.suggestedBucket : undefined,
+        },
+      }));
+      if (macros) {
+        toast.success(`Estimated ~${Math.round(macros.calories)} kcal`);
+      } else if (data.aiConfigured === false) {
+        toast.error("AI is not configured. Set GROQ_API_KEY to estimate macros.");
+      } else {
+        toast.message("Meal identified, but macros could not be estimated.");
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not log meal");
+      toast.error(err instanceof Error ? err.message : "Could not analyse meal");
     } finally {
       setMealBusy(null);
+    }
+  };
+
+  const dismissMealPrompt = (postId: string) => {
+    setMealPrompts((prev) => ({
+      ...prev,
+      [postId]: { ...prev[postId], fading: true },
+    }));
+    window.setTimeout(() => {
+      setMealPrompts((prev) => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+    }, 300);
+  };
+
+  const confirmMealLog = (postId: string) => {
+    const prompt = mealPrompts[postId];
+    if (!prompt) return;
+    writeNutritionFeedDraft({
+      postId,
+      mealName: prompt.mealName,
+      macros: prompt.macros,
+      reportDate: today,
+      suggestedBucket: prompt.suggestedBucket,
+    });
+    setMealPrompts((prev) => {
+      const next = { ...prev };
+      delete next[postId];
+      return next;
+    });
+    navigate({ to: "/nutrition" });
+  };
+
+  const toggleLike = async (postId: string) => {
+    if (likeBusy) return;
+    setLikeBusy(postId);
+    try {
+      const res = await fetch("/api/feed/like", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ postId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Could not update like");
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? { ...post, likedByMe: data.liked, likesCount: data.likesCount }
+            : post,
+        ),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update like");
+    } finally {
+      setLikeBusy(null);
+    }
+  };
+
+  const openEditPost = (post: Post) => {
+    setEditPost(post);
+    setEditContent(post.content ?? "");
+  };
+
+  const submitEditPost = async () => {
+    if (!editPost) return;
+    setEditBusy(true);
+    try {
+      const res = await fetch("/api/feed", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: editPost.id, content: editContent }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Could not update post");
+      toast.success("Post updated");
+      setEditPost(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update post");
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const confirmDeletePost = async () => {
+    if (!deletePost) return;
+    setDeleteBusy(true);
+    try {
+      const res = await fetch("/api/feed", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: deletePost.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Could not delete post");
+      toast.success("Post deleted");
+      setDeletePost(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete post");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const submitReportPost = async () => {
+    if (!reportPost) return;
+    setReportBusy(true);
+    try {
+      const res = await fetch("/api/feed/report", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ postId: reportPost.id, reason: reportReason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Could not report post");
+      toast.success("Report submitted to staff");
+      setReportPost(null);
+      setReportReason("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not report post");
+    } finally {
+      setReportBusy(false);
     }
   };
 
@@ -299,23 +500,43 @@ function Feed() {
     [today, todayData.workouts],
   );
 
-  const handlePost = async (imageBase64?: string | null) => {
-    if (!newPost.trim() && !imageBase64) return;
+  const handlePost = async () => {
+    if (!newPost.trim() && !draftImage) return;
     setBusy(true);
     try {
-      await fetch("/api/feed", {
+      const res = await fetch("/api/feed", {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content: newPost.trim() || "", imageBase64: imageBase64 ?? null }),
+        body: JSON.stringify({
+          content: newPost.trim() || "",
+          imageBase64: draftImage ?? null,
+        }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(typeof data?.error === "string" ? data.error : "Post failed");
+      }
       setNewPost("");
+      setDraftImage(null);
       await load();
       toast.success("Posted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Post failed");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const attachPhoto = async (file: File) => {
+    setImageBusy(true);
+    try {
+      const base64 = await compressImageFile(file);
+      setDraftImage(base64);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not process image");
+    } finally {
+      setImageBusy(false);
     }
   };
 
@@ -382,6 +603,29 @@ function Feed() {
                 onChange={(e) => setNewPost(e.target.value)}
                 className="min-h-[60px] w-full resize-none rounded-lg border-none bg-transparent pt-1 text-sm leading-6 text-slate-200 placeholder:text-slate-500 focus:outline-none"
               />
+              {draftImage && (
+                <div className="relative mt-3 inline-block max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewImage(draftImage)}
+                    className="block overflow-hidden rounded-xl border border-white/10"
+                  >
+                    <img
+                      src={draftImage}
+                      alt="Post preview"
+                      className="max-h-48 max-w-full object-cover"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Remove photo"
+                    onClick={() => setDraftImage(null)}
+                    className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-black/70 text-slate-200 hover:bg-black/90"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <div className="mt-3 flex flex-col gap-3 border-t border-white/5 pt-3 sm:flex-row sm:items-center sm:justify-between">
@@ -393,34 +637,32 @@ function Feed() {
                 className="hidden"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 4 * 1024 * 1024) {
-                    toast.error("Image too large, maximum 4MB");
-                    return;
-                  }
-                  const reader = new FileReader();
-                  reader.onload = async (ev) => {
-                    const base64 = ev.target?.result as string;
-                    await handlePost(base64);
-                  };
-                  reader.readAsDataURL(file);
+                  if (file) await attachPhoto(file);
                   e.currentTarget.value = "";
                 }}
               />
               <Button
                 variant="ghost"
                 size="sm"
-                className="rounded-xl text-slate-400 hover:bg-primary/10 hover:text-primary"
+                disabled={imageBusy}
+                className="rounded-xl text-slate-200 hover:bg-white/10 hover:text-primary"
                 onClick={() => fileRef.current?.click()}
               >
-                <ImageIcon className="mr-2 size-4" /> Add photo
+                {imageBusy ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <ImageIcon className="mr-2 size-4" />
+                )}
+                {draftImage ? "Change photo" : "Add photo"}
               </Button>
-              <div className="text-xs text-slate-400">Optional image or text post</div>
+              <div className="text-xs text-slate-400">
+                Add a caption or a photo
+              </div>
             </div>
             <Button
-              onClick={() => handlePost(null)}
+              onClick={handlePost}
               size="sm"
-              disabled={busy}
+              disabled={busy || imageBusy || (!newPost.trim() && !draftImage)}
               className="rounded-xl bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90"
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : "Post"}
@@ -462,47 +704,108 @@ function Feed() {
                     </div>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-slate-500 hover:text-slate-300"
-                  aria-label="Post options"
-                >
-                  <MoreHorizontal className="size-4" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-slate-300 hover:bg-white/10 hover:text-slate-50"
+                      aria-label="Post options"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="border-white/10 bg-[#111612] text-slate-100"
+                  >
+                    {user?.id && post.userId === user.id ? (
+                      <>
+                        <DropdownMenuItem
+                          className="text-slate-200"
+                          onClick={() => openEditPost(post)}
+                        >
+                          <Pencil className="mr-2 size-4" />
+                          Edit post
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:bg-destructive/15 focus:text-destructive"
+                          onClick={() => setDeletePost(post)}
+                        >
+                          <Trash2 className="mr-2 size-4" />
+                          Delete post
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <DropdownMenuItem
+                        className="text-slate-200"
+                        onClick={() => setReportPost(post)}
+                      >
+                        <Flag className="mr-2 size-4" />
+                        Report post
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               {post.content && (
                 <p className="mt-4 text-sm leading-relaxed text-slate-300">{post.content}</p>
               )}
               {post.imageBase64 && (
-                <div className="mt-3 overflow-hidden rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setPreviewImage(post.imageBase64!)}
+                  className="mt-3 block w-full max-w-sm overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label="View full size image"
+                >
                   <img
                     src={post.imageBase64}
                     alt="Community upload"
-                    className="h-auto w-full rounded-xl object-cover"
+                    className="max-h-56 w-full cursor-zoom-in rounded-xl object-cover transition hover:opacity-90"
                   />
-                </div>
+                </button>
               )}
               <div className="mt-5 border-t border-white/5 pt-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm text-slate-400">{post.likesCount ?? 0} likes</div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={`rounded-xl px-2 ${post.likedByMe ? "text-rose-400 hover:text-rose-300" : "text-slate-400 hover:text-slate-200"}`}
+                    disabled={likeBusy === post.id}
+                    onClick={() => toggleLike(post.id)}
+                  >
+                    {likeBusy === post.id ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <Heart className={`mr-2 size-4 ${post.likedByMe ? "fill-current" : ""}`} />
+                    )}
+                    {post.likesCount ?? 0}
+                  </Button>
                   {user?.id && post.userId === user.id && (
                     <Button
                       size="sm"
-                      variant="ghost"
-                      className="rounded-xl text-primary hover:bg-primary/10"
+                      variant="outline"
+                      className="rounded-xl border-primary/30 bg-primary/10 text-primary hover:border-primary/50 hover:bg-primary/15 hover:text-primary"
                       disabled={mealBusy === post.id}
-                      onClick={() => logMeal(post.id)}
+                      onClick={() => analyseMeal(post.id)}
                     >
                       {mealBusy === post.id ? (
                         <Loader2 className="mr-2 size-4 animate-spin" />
                       ) : (
                         <Utensils className="mr-2 size-4" />
                       )}
-                      Log this meal
+                      Analyse meal
                     </Button>
                   )}
                 </div>
+                {mealPrompts[post.id] && (
+                  <AlexMealPrompt
+                    prompt={mealPrompts[post.id]}
+                    onYes={() => confirmMealLog(post.id)}
+                    onNo={() => dismissMealPrompt(post.id)}
+                  />
+                )}
                 <PostComments
                   comments={commentsByPost[post.id] ?? []}
                   draft={commentDrafts[post.id] ?? ""}
@@ -517,6 +820,90 @@ function Feed() {
           ))}
         </div>
       </section>
+
+      <Dialog open={!!editPost} onOpenChange={(open) => !open && setEditPost(null)}>
+        <DialogContent className="border-white/10 bg-[#111612] text-slate-100">
+          <DialogHeader>
+            <DialogTitle>Edit post</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            rows={4}
+            className="border-white/10 bg-black/30"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPost(null)}>
+              Cancel
+            </Button>
+            <Button onClick={submitEditPost} disabled={editBusy}>
+              {editBusy ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deletePost} onOpenChange={(open) => !open && setDeletePost(null)}>
+        <AlertDialogContent className="border-white/10 bg-[#111612] text-slate-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              This cannot be undone. Comments on this post will also be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDeletePost();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteBusy ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!reportPost} onOpenChange={(open) => !open && setReportPost(null)}>
+        <DialogContent className="border-white/10 bg-[#111612] text-slate-100">
+          <DialogHeader>
+            <DialogTitle>Report post</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={reportReason}
+            onChange={(e) => setReportReason(e.target.value)}
+            placeholder="Optional: tell staff why you are reporting this post"
+            rows={3}
+            className="border-white/10 bg-black/30"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportPost(null)}>
+              Cancel
+            </Button>
+            <Button onClick={submitReportPost} disabled={reportBusy}>
+              {reportBusy ? "Submitting..." : "Submit report"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
+        <DialogContent className="max-h-[90vh] max-w-3xl border-white/10 bg-[#111612] p-2">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Community photo</DialogTitle>
+          </DialogHeader>
+          {previewImage && (
+            <img
+              src={previewImage}
+              alt="Community upload"
+              className="max-h-[80vh] w-full rounded-lg object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -788,7 +1175,7 @@ function PostComments({
       {comments.length > 0 && (
         <div className="space-y-2">
           {comments.map((comment) =>
-            comment.isAgent ? (
+            Number(comment.isAgent) > 0 ? (
               <AgentComment key={comment.id} comment={comment} />
             ) : (
               <HumanComment key={comment.id} comment={comment} />
@@ -837,6 +1224,62 @@ function HumanComment({ comment }: { comment: CommentRow }) {
   );
 }
 
+function AlexMealPrompt({
+  prompt,
+  onYes,
+  onNo,
+}: {
+  prompt: MealPrompt;
+  onYes: () => void;
+  onNo: () => void;
+}) {
+  return (
+    <div
+      className={`mt-3 rounded-xl border border-primary/20 bg-primary/[0.06] p-3 transition-opacity duration-300 ${prompt.fading ? "opacity-0" : "opacity-100"}`}
+    >
+      <div className="flex items-start gap-2">
+        <div className="grid size-7 flex-shrink-0 place-items-center rounded-lg bg-primary/20 text-primary">
+          <Sparkles className="size-4" />
+        </div>
+        <div className="flex-1">
+          <div className="text-xs font-semibold text-primary">Alex</div>
+          <div className="text-sm text-slate-200">
+            I estimated <span className="font-medium text-slate-50">{prompt.mealName}</span>
+            {prompt.macros ? " with these macros:" : "."}
+          </div>
+          {prompt.macros ? (
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+              <MacroPill label="Calories" value={`${Math.round(prompt.macros.calories)} kcal`} />
+              <MacroPill label="Protein" value={`${Math.round(prompt.macros.proteinG)} g`} />
+              <MacroPill label="Carbs" value={`${Math.round(prompt.macros.carbsG)} g`} />
+              <MacroPill label="Fat" value={`${Math.round(prompt.macros.fatsG)} g`} />
+            </div>
+          ) : (
+            <p className="mt-2 text-xs leading-5 text-slate-400">
+              Macros could not be estimated automatically. You can still log the meal and enter
+              totals manually on the nutrition page.
+            </p>
+          )}
+          <div className="mt-3 text-sm font-medium text-slate-100">Log this meal?</div>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" className="rounded-xl bg-primary text-primary-foreground" onClick={onYes}>
+              Yes, log this meal
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-xl border-white/15 text-slate-200 hover:border-white/25 hover:bg-white/10 hover:text-slate-50"
+              onClick={onNo}
+            >
+              No
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AgentComment({ comment }: { comment: CommentRow }) {
   const macros = parseMacros(comment.macrosJson);
   return (
@@ -876,12 +1319,7 @@ function parseMacros(
   try {
     const obj = JSON.parse(json) as Record<string, unknown>;
     if (obj && typeof obj === "object") {
-      return {
-        calories: Number(obj.calories) || 0,
-        proteinG: Number(obj.proteinG) || 0,
-        carbsG: Number(obj.carbsG) || 0,
-        fatsG: Number(obj.fatsG) || 0,
-      };
+      return normalizeMealMacros(obj);
     }
   } catch {
     return null;

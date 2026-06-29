@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useCleanDatabase } from "@/test/use-clean-database";
+
+useCleanDatabase();
 
 beforeEach(() => {
   vi.resetModules();
@@ -188,6 +191,8 @@ describe("trainer context builder", () => {
 
     expect(context.days).toBe(14);
     expect(context.text).toContain("Goal: Build strength");
+    expect(context.text).toContain("HL Fitness equipment layout");
+    expect(context.text).toContain("Hack squat machine");
     expect(context.text).toContain("Limitations: Previous shoulder irritation");
     expect(context.text).toContain("Back squat");
     expect(context.text).toContain("rice and chicken");
@@ -202,6 +207,6 @@ describe("trainer context builder", () => {
     expect(context.text).toContain("Interested in renewing");
     expect(context.text).not.toContain("Other user squat");
     expect(context.text).not.toContain("Old deadlift");
-    expect(context.text.length).toBeLessThan(6000);
+    expect(context.text.length).toBeLessThan(11000);
   });
 });

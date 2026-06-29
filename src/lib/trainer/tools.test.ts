@@ -28,7 +28,6 @@ describe("Alex trainer tools", () => {
             input: {
               planDate: "2026-06-04",
               daysPerWeek: "4 days",
-              equipment: "Full gym",
               goal: "build muscle",
               level: "3 years training experience",
             },

@@ -8,6 +8,7 @@ import logDevError from "@/lib/error-logger";
 import type { MaybeWrappedRequest } from "@/types/dev";
 import { canUsePublicSignup, PUBLIC_SIGNUP_DISABLED_ERROR } from "@/lib/signup-policy";
 import { authEmailSchema } from "@/lib/auth-input";
+import { HL_FITNESS_GYM_ACCESS } from "@/lib/trainer/hl-fitness-layout";
 
 const inputSchema = z.object({
   email: authEmailSchema,
@@ -126,7 +127,7 @@ export const Route = createFileRoute("/api/signup")({
               role: adminExists ? "customer" : "admin",
               mustChangePassword: 0,
             });
-          await db.insert(schema.profiles).values({ userId: id });
+          await db.insert(schema.profiles).values({ userId: id, equipment: HL_FITNESS_GYM_ACCESS });
           // Only create a session and set the cookie if the client explicitly requested auto sign-in.
           if (data.autoSignIn === true) {
             const { token, expiresAt } = await createSession(id);

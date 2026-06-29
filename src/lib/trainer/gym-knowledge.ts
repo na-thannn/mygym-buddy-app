@@ -5,8 +5,9 @@ import {
   type MembershipStatus,
 } from "@/lib/crm";
 import { db, schema } from "@/server/db";
+import { formatHlFitnessEquipmentLayout } from "./hl-fitness-layout";
 
-const MAX_GYM_KNOWLEDGE_CHARS = 5200;
+const MAX_GYM_KNOWLEDGE_CHARS = 9000;
 
 export type GymKnowledgeTopic =
   | "all"
@@ -257,6 +258,7 @@ export async function buildGymKnowledge({
 
   const sections = [
     `HL Fitness gym knowledge (DB-backed, today ${today}):`,
+    formatHlFitnessEquipmentLayout(),
     includeTopic(topic, ["all"]) ? formatBranches(branches) : "",
     includeTopic(topic, ["all", "plans"]) ? formatPlans(plans) : "",
     includeTopic(topic, ["all", "plans", "pts"]) ? formatServices(services) : "",

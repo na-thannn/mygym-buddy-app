@@ -19,6 +19,7 @@ import {
   Weight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { HL_FITNESS_GYM_ACCESS } from "@/lib/trainer/hl-fitness-layout";
 import { KineticSurface, OptimizedPicture } from "@/components/motion/public-funnel-motion";
 
 export const Route = createFileRoute("/get-started")({
@@ -75,6 +76,7 @@ function GetStarted() {
   const [data, setData] = useState({
     goal: "",
     experience: "",
+    daysPerWeek: "",
     name: "",
     email: "",
     phone: "",
@@ -90,6 +92,7 @@ function GetStarted() {
     { title: "Prepare for Event", icon: Trophy, desc: "Train for a specific sport or event." },
   ];
   const levels = ["Beginner", "Intermediate", "Advanced"] as const;
+  const daysOptions = ["2 days", "3 days", "4 days", "5 days", "6+ days"] as const;
 
   useEffect(() => {
     fetch("/api/guest-meeting-options")
@@ -108,7 +111,7 @@ function GetStarted() {
       .catch((err) => toast.error(err instanceof Error ? err.message : "Unable to load options"));
   }, []);
 
-  const progress = step < 5 ? `${(step / 4) * 100}%` : "100%";
+  const progress = step < 6 ? `${(step / 5) * 100}%` : "100%";
 
   const submitGuestMeeting = async () => {
     setSubmitting(true);
@@ -122,6 +125,8 @@ function GetStarted() {
           phone: data.phone,
           goal: data.goal,
           experience: data.experience,
+          daysPerWeek: data.daysPerWeek,
+          equipment: HL_FITNESS_GYM_ACCESS,
           requestedPtId: data.requestedPtId,
           scheduledAt: data.scheduledAt,
           meetingType: data.meetingType,
@@ -130,7 +135,7 @@ function GetStarted() {
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload?.error ?? "Meeting request failed");
       setResult(payload as SubmitResult);
-      setStep(5);
+      setStep(6);
       if ((payload as SubmitResult).emailSent) toast.success("Meeting request confirmed");
       else toast.warning("Meeting saved. Email delivery needs SMTP setup.");
     } catch (err) {
@@ -284,14 +289,43 @@ function GetStarted() {
                   )}
 
                   {step === 3 && (
+                    <div className="space-y-6">
+                      <BackButton onClick={() => setStep(2)} />
+                      <Header
+                        title="How many days per week?"
+                        desc="Alex uses this to shape your first training plan after you join."
+                      />
+                      <div className="space-y-3">
+                        {daysOptions.map((days) => (
+                          <button
+                            key={days}
+                            type="button"
+                            onClick={() => {
+                              setData({ ...data, daysPerWeek: days });
+                              setStep(4);
+                            }}
+                            className={`w-full rounded-xl border p-4 text-center font-medium transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                              data.daysPerWeek === days
+                                ? "border-primary bg-primary/12 text-primary"
+                                : "border-white/10 bg-white/[0.04] text-stone-200 hover:bg-white/[0.07]"
+                            }`}
+                          >
+                            {days}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {step === 4 && (
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
-                        setStep(4);
+                        setStep(5);
                       }}
                       className="space-y-6"
                     >
-                      <BackButton onClick={() => setStep(2)} />
+                      <BackButton onClick={() => setStep(3)} />
                       <Header
                         title="Your contact details"
                         desc="We send meeting confirmation to your email. No account is created yet."
@@ -335,9 +369,9 @@ function GetStarted() {
                     </form>
                   )}
 
-                  {step === 4 && (
+                  {step === 5 && (
                     <div className="space-y-6">
-                      <BackButton onClick={() => setStep(3)} />
+                      <BackButton onClick={() => setStep(4)} />
                       <Header
                         title="Pick a coach and time"
                         desc="If the selected coach is unavailable for that slot, we assign the first available coach."
@@ -535,7 +569,7 @@ function GetStarted() {
                     </div>
                   )}
 
-                  {step === 5 && result && (
+                  {step === 6 && result && (
                     <div className="py-6 text-center">
                       <div className="mx-auto mb-5 grid size-16 place-items-center rounded-2xl bg-primary text-primary-foreground">
                         <CheckCircle2 className="size-8" strokeWidth={1.8} />

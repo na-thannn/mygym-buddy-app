@@ -31,7 +31,8 @@ const saveProfileInput = z.object({
   gender: z.string().max(20).nullable().optional(),
   heightCm: z.number().min(50).max(280).nullable().optional(),
   weightKg: z.number().min(20).max(400).nullable().optional(),
-  targetWeightKg: z.number().min(20).max(400).nullable().optional(),
+  daysPerWeek: z.string().max(40).nullable().optional(),
+  equipment: z.string().max(120).nullable().optional(),
 });
 
 export const saveProfile = createServerFn({ method: "POST" })

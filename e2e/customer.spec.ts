@@ -66,6 +66,40 @@ test.describe("Customer workflows", () => {
     await expect(page.getByRole("button", { name: exercise, exact: true })).toBeVisible();
   });
 
+  test("workout entry can be updated and deleted via API", async ({ page }) => {
+    const suffix = uniqueSuffix();
+    const exercise = `E2E Squat ${suffix}`;
+    const createRes = await page.request.post("/api/log/workout", {
+      data: {
+        performedAt: "2026-06-20",
+        exercise,
+        sets: 4,
+        reps: "5",
+        weightKg: 100,
+      },
+    });
+    expect(createRes.ok(), await createRes.text()).toBeTruthy();
+    const { id } = (await createRes.json()) as { id: string };
+
+    const patchRes = await page.request.patch("/api/log/workout", {
+      data: { id, sets: 5, weightKg: 105 },
+    });
+    expect(patchRes.ok(), await patchRes.text()).toBeTruthy();
+
+    const listRes = await page.request.get("/api/log/workout?limit=50");
+    const rows = (await listRes.json()) as Array<{ id: string; sets: number; weightKg: number }>;
+    const updated = rows.find((r) => r.id === id);
+    expect(updated?.sets).toBe(5);
+    expect(updated?.weightKg).toBe(105);
+
+    const deleteRes = await page.request.delete("/api/log/workout", { data: { id } });
+    expect(deleteRes.ok(), await deleteRes.text()).toBeTruthy();
+
+    const afterRes = await page.request.get("/api/log/workout?limit=50");
+    const afterRows = (await afterRes.json()) as Array<{ id: string }>;
+    expect(afterRows.some((r) => r.id === id)).toBe(false);
+  });
+
   test("nutrition log can be saved via API", async ({ page }) => {
     const response = await page.request.post("/api/log/nutrition-report", {
       data: {

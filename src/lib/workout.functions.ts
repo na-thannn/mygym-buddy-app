@@ -33,6 +33,48 @@ export const logWorkoutEntry = createServerFn({ method: "POST" })
     return { ok: true, id };
   });
 
+const updateInput = logInput.extend({
+  id: z.string().min(1),
+});
+
+export const updateWorkoutEntry = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => updateInput.parse(d))
+  .handler(async ({ data }) => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
+    const { eq, and } = await import("drizzle-orm");
+    const { id, ...fields } = data;
+    const [existing] = await db
+      .select({ id: schema.workoutLogs.id })
+      .from(schema.workoutLogs)
+      .where(and(eq(schema.workoutLogs.id, id), eq(schema.workoutLogs.userId, session.userId)))
+      .limit(1);
+    if (!existing) throw new Response("Not found", { status: 404 });
+    await db
+      .update(schema.workoutLogs)
+      .set(fields)
+      .where(and(eq(schema.workoutLogs.id, id), eq(schema.workoutLogs.userId, session.userId)));
+    return { ok: true, id };
+  });
+
+export const deleteWorkoutEntry = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .handler(async ({ data }) => {
+    const session = await requireSession();
+    const { db, schema } = await import("@/server/db");
+    const { eq, and } = await import("drizzle-orm");
+    const [existing] = await db
+      .select({ id: schema.workoutLogs.id })
+      .from(schema.workoutLogs)
+      .where(and(eq(schema.workoutLogs.id, data.id), eq(schema.workoutLogs.userId, session.userId)))
+      .limit(1);
+    if (!existing) throw new Response("Not found", { status: 404 });
+    await db
+      .delete(schema.workoutLogs)
+      .where(and(eq(schema.workoutLogs.id, data.id), eq(schema.workoutLogs.userId, session.userId)));
+    return { ok: true };
+  });
+
 export const listRecentWorkouts = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) =>
     z

@@ -34,6 +34,7 @@ test.describe("Public pages", () => {
         phone: "+84900000000",
         goal: "Build Muscle",
         experience: "Beginner",
+        daysPerWeek: "3 days",
         requestedPtId: booking.ptId,
         scheduledAt: booking.scheduledAt,
         meetingType: "in_person",

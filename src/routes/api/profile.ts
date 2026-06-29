@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { readSessionCookie, validateSessionToken } from "@/server/auth";
-import { db, schema } from "@/server/db";
+import { HL_FITNESS_GYM_ACCESS } from "@/lib/trainer/hl-fitness-layout";
+import { readSessionCookie, validateSessionToken } from "@/server/auth";import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { parseRequestBody } from "@/lib/request-utils";
 import logDevError from "@/lib/error-logger";
@@ -42,6 +42,7 @@ export const Route = createFileRoute("/api/profile")({
           .limit(1);
         const patch = {
           ...(bodyObj as Record<string, unknown>),
+          equipment: HL_FITNESS_GYM_ACCESS,
           updatedAt: new Date().toISOString(),
         };
         try {

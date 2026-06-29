@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useCleanDatabase } from "@/test/use-clean-database";
+
+useCleanDatabase();
 
 const authMock = vi.hoisted(() => ({
   getSessionUser: vi.fn(),

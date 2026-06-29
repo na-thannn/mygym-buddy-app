@@ -61,6 +61,7 @@ import { Route as ApiPublicPackagesRouteImport } from './routes/api/public/packa
 import { Route as ApiPublicLandingRouteImport } from './routes/api/public/landing'
 import { Route as ApiPublicEventsRouteImport } from './routes/api/public/events'
 import { Route as ApiPtServicesRouteImport } from './routes/api/pt/services'
+import { Route as ApiNutritionAnalyseMealRouteImport } from './routes/api/nutrition.analyse-meal'
 import { Route as ApiManagerServicesRouteImport } from './routes/api/manager/services'
 import { Route as ApiManagerPurchaseRequestsRouteImport } from './routes/api/manager/purchase-requests'
 import { Route as ApiManagerPromotionsRouteImport } from './routes/api/manager/promotions'
@@ -70,8 +71,13 @@ import { Route as ApiManagerMembershipsRouteImport } from './routes/api/manager/
 import { Route as ApiManagerEventsRouteImport } from './routes/api/manager/events'
 import { Route as ApiLogWorkoutRouteImport } from './routes/api/log/workout'
 import { Route as ApiLogNutritionReportRouteImport } from './routes/api/log/nutrition-report'
+import { Route as ApiInbodyScanRouteImport } from './routes/api/inbody.scan'
+import { Route as ApiFeedReportRouteImport } from './routes/api/feed.report'
 import { Route as ApiFeedLogMealRouteImport } from './routes/api/feed.log-meal'
+import { Route as ApiFeedLikeRouteImport } from './routes/api/feed.like'
+import { Route as ApiFeedConfirmMealLogRouteImport } from './routes/api/feed.confirm-meal-log'
 import { Route as ApiFeedCommentsRouteImport } from './routes/api/feed.comments'
+import { Route as ApiFeedAnalyseMealRouteImport } from './routes/api/feed.analyse-meal'
 import { Route as ApiCustomerPackageRequestsRouteImport } from './routes/api/customer/package-requests'
 import { Route as ApiCustomerMembershipsRouteImport } from './routes/api/customer/memberships'
 import { Route as ApiChatThreadsRouteImport } from './routes/api/chat/threads'
@@ -346,6 +352,11 @@ const ApiPtServicesRoute = ApiPtServicesRouteImport.update({
   path: '/api/pt/services',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiNutritionAnalyseMealRoute = ApiNutritionAnalyseMealRouteImport.update({
+  id: '/api/nutrition/analyse-meal',
+  path: '/api/nutrition/analyse-meal',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiManagerServicesRoute = ApiManagerServicesRouteImport.update({
   id: '/api/manager/services',
   path: '/api/manager/services',
@@ -392,14 +403,39 @@ const ApiLogNutritionReportRoute = ApiLogNutritionReportRouteImport.update({
   path: '/api/log/nutrition-report',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInbodyScanRoute = ApiInbodyScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => ApiInbodyRoute,
+} as any)
+const ApiFeedReportRoute = ApiFeedReportRouteImport.update({
+  id: '/report',
+  path: '/report',
+  getParentRoute: () => ApiFeedRoute,
+} as any)
 const ApiFeedLogMealRoute = ApiFeedLogMealRouteImport.update({
   id: '/log-meal',
   path: '/log-meal',
   getParentRoute: () => ApiFeedRoute,
 } as any)
+const ApiFeedLikeRoute = ApiFeedLikeRouteImport.update({
+  id: '/like',
+  path: '/like',
+  getParentRoute: () => ApiFeedRoute,
+} as any)
+const ApiFeedConfirmMealLogRoute = ApiFeedConfirmMealLogRouteImport.update({
+  id: '/confirm-meal-log',
+  path: '/confirm-meal-log',
+  getParentRoute: () => ApiFeedRoute,
+} as any)
 const ApiFeedCommentsRoute = ApiFeedCommentsRouteImport.update({
   id: '/comments',
   path: '/comments',
+  getParentRoute: () => ApiFeedRoute,
+} as any)
+const ApiFeedAnalyseMealRoute = ApiFeedAnalyseMealRouteImport.update({
+  id: '/analyse-meal',
+  path: '/analyse-meal',
   getParentRoute: () => ApiFeedRoute,
 } as any)
 const ApiCustomerPackageRequestsRoute =
@@ -491,7 +527,7 @@ export interface FileRoutesByFullPath {
   '/api/feed': typeof ApiFeedRouteWithChildren
   '/api/guest-meeting-options': typeof ApiGuestMeetingOptionsRoute
   '/api/guest-meetings': typeof ApiGuestMeetingsRoute
-  '/api/inbody': typeof ApiInbodyRoute
+  '/api/inbody': typeof ApiInbodyRouteWithChildren
   '/api/password': typeof ApiPasswordRoute
   '/api/plan-feedback': typeof ApiPlanFeedbackRoute
   '/api/plans': typeof ApiPlansRoute
@@ -517,8 +553,13 @@ export interface FileRoutesByFullPath {
   '/api/chat/threads': typeof ApiChatThreadsRoute
   '/api/customer/memberships': typeof ApiCustomerMembershipsRoute
   '/api/customer/package-requests': typeof ApiCustomerPackageRequestsRoute
+  '/api/feed/analyse-meal': typeof ApiFeedAnalyseMealRoute
   '/api/feed/comments': typeof ApiFeedCommentsRoute
+  '/api/feed/confirm-meal-log': typeof ApiFeedConfirmMealLogRoute
+  '/api/feed/like': typeof ApiFeedLikeRoute
   '/api/feed/log-meal': typeof ApiFeedLogMealRoute
+  '/api/feed/report': typeof ApiFeedReportRoute
+  '/api/inbody/scan': typeof ApiInbodyScanRoute
   '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
   '/api/log/workout': typeof ApiLogWorkoutRoute
   '/api/manager/events': typeof ApiManagerEventsRoute
@@ -528,6 +569,7 @@ export interface FileRoutesByFullPath {
   '/api/manager/promotions': typeof ApiManagerPromotionsRoute
   '/api/manager/purchase-requests': typeof ApiManagerPurchaseRequestsRoute
   '/api/manager/services': typeof ApiManagerServicesRoute
+  '/api/nutrition/analyse-meal': typeof ApiNutritionAnalyseMealRoute
   '/api/pt/services': typeof ApiPtServicesRoute
   '/api/public/events': typeof ApiPublicEventsRoute
   '/api/public/landing': typeof ApiPublicLandingRoute
@@ -565,7 +607,7 @@ export interface FileRoutesByTo {
   '/api/feed': typeof ApiFeedRouteWithChildren
   '/api/guest-meeting-options': typeof ApiGuestMeetingOptionsRoute
   '/api/guest-meetings': typeof ApiGuestMeetingsRoute
-  '/api/inbody': typeof ApiInbodyRoute
+  '/api/inbody': typeof ApiInbodyRouteWithChildren
   '/api/password': typeof ApiPasswordRoute
   '/api/plan-feedback': typeof ApiPlanFeedbackRoute
   '/api/plans': typeof ApiPlansRoute
@@ -591,8 +633,13 @@ export interface FileRoutesByTo {
   '/api/chat/threads': typeof ApiChatThreadsRoute
   '/api/customer/memberships': typeof ApiCustomerMembershipsRoute
   '/api/customer/package-requests': typeof ApiCustomerPackageRequestsRoute
+  '/api/feed/analyse-meal': typeof ApiFeedAnalyseMealRoute
   '/api/feed/comments': typeof ApiFeedCommentsRoute
+  '/api/feed/confirm-meal-log': typeof ApiFeedConfirmMealLogRoute
+  '/api/feed/like': typeof ApiFeedLikeRoute
   '/api/feed/log-meal': typeof ApiFeedLogMealRoute
+  '/api/feed/report': typeof ApiFeedReportRoute
+  '/api/inbody/scan': typeof ApiInbodyScanRoute
   '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
   '/api/log/workout': typeof ApiLogWorkoutRoute
   '/api/manager/events': typeof ApiManagerEventsRoute
@@ -602,6 +649,7 @@ export interface FileRoutesByTo {
   '/api/manager/promotions': typeof ApiManagerPromotionsRoute
   '/api/manager/purchase-requests': typeof ApiManagerPurchaseRequestsRoute
   '/api/manager/services': typeof ApiManagerServicesRoute
+  '/api/nutrition/analyse-meal': typeof ApiNutritionAnalyseMealRoute
   '/api/pt/services': typeof ApiPtServicesRoute
   '/api/public/events': typeof ApiPublicEventsRoute
   '/api/public/landing': typeof ApiPublicLandingRoute
@@ -642,7 +690,7 @@ export interface FileRoutesById {
   '/api/feed': typeof ApiFeedRouteWithChildren
   '/api/guest-meeting-options': typeof ApiGuestMeetingOptionsRoute
   '/api/guest-meetings': typeof ApiGuestMeetingsRoute
-  '/api/inbody': typeof ApiInbodyRoute
+  '/api/inbody': typeof ApiInbodyRouteWithChildren
   '/api/password': typeof ApiPasswordRoute
   '/api/plan-feedback': typeof ApiPlanFeedbackRoute
   '/api/plans': typeof ApiPlansRoute
@@ -668,8 +716,13 @@ export interface FileRoutesById {
   '/api/chat/threads': typeof ApiChatThreadsRoute
   '/api/customer/memberships': typeof ApiCustomerMembershipsRoute
   '/api/customer/package-requests': typeof ApiCustomerPackageRequestsRoute
+  '/api/feed/analyse-meal': typeof ApiFeedAnalyseMealRoute
   '/api/feed/comments': typeof ApiFeedCommentsRoute
+  '/api/feed/confirm-meal-log': typeof ApiFeedConfirmMealLogRoute
+  '/api/feed/like': typeof ApiFeedLikeRoute
   '/api/feed/log-meal': typeof ApiFeedLogMealRoute
+  '/api/feed/report': typeof ApiFeedReportRoute
+  '/api/inbody/scan': typeof ApiInbodyScanRoute
   '/api/log/nutrition-report': typeof ApiLogNutritionReportRoute
   '/api/log/workout': typeof ApiLogWorkoutRoute
   '/api/manager/events': typeof ApiManagerEventsRoute
@@ -679,6 +732,7 @@ export interface FileRoutesById {
   '/api/manager/promotions': typeof ApiManagerPromotionsRoute
   '/api/manager/purchase-requests': typeof ApiManagerPurchaseRequestsRoute
   '/api/manager/services': typeof ApiManagerServicesRoute
+  '/api/nutrition/analyse-meal': typeof ApiNutritionAnalyseMealRoute
   '/api/pt/services': typeof ApiPtServicesRoute
   '/api/public/events': typeof ApiPublicEventsRoute
   '/api/public/landing': typeof ApiPublicLandingRoute
@@ -745,8 +799,13 @@ export interface FileRouteTypes {
     | '/api/chat/threads'
     | '/api/customer/memberships'
     | '/api/customer/package-requests'
+    | '/api/feed/analyse-meal'
     | '/api/feed/comments'
+    | '/api/feed/confirm-meal-log'
+    | '/api/feed/like'
     | '/api/feed/log-meal'
+    | '/api/feed/report'
+    | '/api/inbody/scan'
     | '/api/log/nutrition-report'
     | '/api/log/workout'
     | '/api/manager/events'
@@ -756,6 +815,7 @@ export interface FileRouteTypes {
     | '/api/manager/promotions'
     | '/api/manager/purchase-requests'
     | '/api/manager/services'
+    | '/api/nutrition/analyse-meal'
     | '/api/pt/services'
     | '/api/public/events'
     | '/api/public/landing'
@@ -819,8 +879,13 @@ export interface FileRouteTypes {
     | '/api/chat/threads'
     | '/api/customer/memberships'
     | '/api/customer/package-requests'
+    | '/api/feed/analyse-meal'
     | '/api/feed/comments'
+    | '/api/feed/confirm-meal-log'
+    | '/api/feed/like'
     | '/api/feed/log-meal'
+    | '/api/feed/report'
+    | '/api/inbody/scan'
     | '/api/log/nutrition-report'
     | '/api/log/workout'
     | '/api/manager/events'
@@ -830,6 +895,7 @@ export interface FileRouteTypes {
     | '/api/manager/promotions'
     | '/api/manager/purchase-requests'
     | '/api/manager/services'
+    | '/api/nutrition/analyse-meal'
     | '/api/pt/services'
     | '/api/public/events'
     | '/api/public/landing'
@@ -895,8 +961,13 @@ export interface FileRouteTypes {
     | '/api/chat/threads'
     | '/api/customer/memberships'
     | '/api/customer/package-requests'
+    | '/api/feed/analyse-meal'
     | '/api/feed/comments'
+    | '/api/feed/confirm-meal-log'
+    | '/api/feed/like'
     | '/api/feed/log-meal'
+    | '/api/feed/report'
+    | '/api/inbody/scan'
     | '/api/log/nutrition-report'
     | '/api/log/workout'
     | '/api/manager/events'
@@ -906,6 +977,7 @@ export interface FileRouteTypes {
     | '/api/manager/promotions'
     | '/api/manager/purchase-requests'
     | '/api/manager/services'
+    | '/api/nutrition/analyse-meal'
     | '/api/pt/services'
     | '/api/public/events'
     | '/api/public/landing'
@@ -929,7 +1001,7 @@ export interface RootRouteChildren {
   ApiFeedRoute: typeof ApiFeedRouteWithChildren
   ApiGuestMeetingOptionsRoute: typeof ApiGuestMeetingOptionsRoute
   ApiGuestMeetingsRoute: typeof ApiGuestMeetingsRoute
-  ApiInbodyRoute: typeof ApiInbodyRoute
+  ApiInbodyRoute: typeof ApiInbodyRouteWithChildren
   ApiPasswordRoute: typeof ApiPasswordRoute
   ApiPlanFeedbackRoute: typeof ApiPlanFeedbackRoute
   ApiPlansRoute: typeof ApiPlansRoute
@@ -960,6 +1032,7 @@ export interface RootRouteChildren {
   ApiManagerPromotionsRoute: typeof ApiManagerPromotionsRoute
   ApiManagerPurchaseRequestsRoute: typeof ApiManagerPurchaseRequestsRoute
   ApiManagerServicesRoute: typeof ApiManagerServicesRoute
+  ApiNutritionAnalyseMealRoute: typeof ApiNutritionAnalyseMealRoute
   ApiPtServicesRoute: typeof ApiPtServicesRoute
   ApiPublicEventsRoute: typeof ApiPublicEventsRoute
   ApiPublicLandingRoute: typeof ApiPublicLandingRoute
@@ -1333,6 +1406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPtServicesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/nutrition/analyse-meal': {
+      id: '/api/nutrition/analyse-meal'
+      path: '/api/nutrition/analyse-meal'
+      fullPath: '/api/nutrition/analyse-meal'
+      preLoaderRoute: typeof ApiNutritionAnalyseMealRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/manager/services': {
       id: '/api/manager/services'
       path: '/api/manager/services'
@@ -1396,6 +1476,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLogNutritionReportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/inbody/scan': {
+      id: '/api/inbody/scan'
+      path: '/scan'
+      fullPath: '/api/inbody/scan'
+      preLoaderRoute: typeof ApiInbodyScanRouteImport
+      parentRoute: typeof ApiInbodyRoute
+    }
+    '/api/feed/report': {
+      id: '/api/feed/report'
+      path: '/report'
+      fullPath: '/api/feed/report'
+      preLoaderRoute: typeof ApiFeedReportRouteImport
+      parentRoute: typeof ApiFeedRoute
+    }
     '/api/feed/log-meal': {
       id: '/api/feed/log-meal'
       path: '/log-meal'
@@ -1403,11 +1497,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFeedLogMealRouteImport
       parentRoute: typeof ApiFeedRoute
     }
+    '/api/feed/like': {
+      id: '/api/feed/like'
+      path: '/like'
+      fullPath: '/api/feed/like'
+      preLoaderRoute: typeof ApiFeedLikeRouteImport
+      parentRoute: typeof ApiFeedRoute
+    }
+    '/api/feed/confirm-meal-log': {
+      id: '/api/feed/confirm-meal-log'
+      path: '/confirm-meal-log'
+      fullPath: '/api/feed/confirm-meal-log'
+      preLoaderRoute: typeof ApiFeedConfirmMealLogRouteImport
+      parentRoute: typeof ApiFeedRoute
+    }
     '/api/feed/comments': {
       id: '/api/feed/comments'
       path: '/comments'
       fullPath: '/api/feed/comments'
       preLoaderRoute: typeof ApiFeedCommentsRouteImport
+      parentRoute: typeof ApiFeedRoute
+    }
+    '/api/feed/analyse-meal': {
+      id: '/api/feed/analyse-meal'
+      path: '/analyse-meal'
+      fullPath: '/api/feed/analyse-meal'
+      preLoaderRoute: typeof ApiFeedAnalyseMealRouteImport
       parentRoute: typeof ApiFeedRoute
     }
     '/api/customer/package-requests': {
@@ -1566,17 +1681,37 @@ const ApiChatRouteWithChildren =
   ApiChatRoute._addFileChildren(ApiChatRouteChildren)
 
 interface ApiFeedRouteChildren {
+  ApiFeedAnalyseMealRoute: typeof ApiFeedAnalyseMealRoute
   ApiFeedCommentsRoute: typeof ApiFeedCommentsRoute
+  ApiFeedConfirmMealLogRoute: typeof ApiFeedConfirmMealLogRoute
+  ApiFeedLikeRoute: typeof ApiFeedLikeRoute
   ApiFeedLogMealRoute: typeof ApiFeedLogMealRoute
+  ApiFeedReportRoute: typeof ApiFeedReportRoute
 }
 
 const ApiFeedRouteChildren: ApiFeedRouteChildren = {
+  ApiFeedAnalyseMealRoute: ApiFeedAnalyseMealRoute,
   ApiFeedCommentsRoute: ApiFeedCommentsRoute,
+  ApiFeedConfirmMealLogRoute: ApiFeedConfirmMealLogRoute,
+  ApiFeedLikeRoute: ApiFeedLikeRoute,
   ApiFeedLogMealRoute: ApiFeedLogMealRoute,
+  ApiFeedReportRoute: ApiFeedReportRoute,
 }
 
 const ApiFeedRouteWithChildren =
   ApiFeedRoute._addFileChildren(ApiFeedRouteChildren)
+
+interface ApiInbodyRouteChildren {
+  ApiInbodyScanRoute: typeof ApiInbodyScanRoute
+}
+
+const ApiInbodyRouteChildren: ApiInbodyRouteChildren = {
+  ApiInbodyScanRoute: ApiInbodyScanRoute,
+}
+
+const ApiInbodyRouteWithChildren = ApiInbodyRoute._addFileChildren(
+  ApiInbodyRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -1593,7 +1728,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFeedRoute: ApiFeedRouteWithChildren,
   ApiGuestMeetingOptionsRoute: ApiGuestMeetingOptionsRoute,
   ApiGuestMeetingsRoute: ApiGuestMeetingsRoute,
-  ApiInbodyRoute: ApiInbodyRoute,
+  ApiInbodyRoute: ApiInbodyRouteWithChildren,
   ApiPasswordRoute: ApiPasswordRoute,
   ApiPlanFeedbackRoute: ApiPlanFeedbackRoute,
   ApiPlansRoute: ApiPlansRoute,
@@ -1624,6 +1759,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiManagerPromotionsRoute: ApiManagerPromotionsRoute,
   ApiManagerPurchaseRequestsRoute: ApiManagerPurchaseRequestsRoute,
   ApiManagerServicesRoute: ApiManagerServicesRoute,
+  ApiNutritionAnalyseMealRoute: ApiNutritionAnalyseMealRoute,
   ApiPtServicesRoute: ApiPtServicesRoute,
   ApiPublicEventsRoute: ApiPublicEventsRoute,
   ApiPublicLandingRoute: ApiPublicLandingRoute,

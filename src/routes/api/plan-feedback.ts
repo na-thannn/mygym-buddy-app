@@ -5,7 +5,12 @@ import { eq } from "drizzle-orm";
 import { parseRequestBody } from "@/lib/request-utils";
 import logDevError from "@/lib/error-logger";
 import { generateText } from "ai";
-import { getGroq, ALEX_MODEL_ID } from "@/lib/trainer/groq";
+import {
+  AI_NOT_CONFIGURED_MESSAGE,
+  ALEX_MODEL_ID,
+  getModelProvider,
+  isAiConfigured,
+} from "@/lib/trainer/groq";
 
 type PlanFeedbackInput = {
   title?: string | null;
@@ -50,11 +55,19 @@ export const Route = createFileRoute("/api/plan-feedback")({
           .where(eq(schema.profiles.userId, session.userId))
           .limit(1);
 
-        let groq;
+        if (!isAiConfigured()) {
+          return new Response(JSON.stringify({ error: AI_NOT_CONFIGURED_MESSAGE }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        let provider;
         try {
-          groq = getGroq();
-        } catch (err) {
-          return new Response(JSON.stringify({ error: "Missing GROQ_API_KEY" }), {
+          provider = getModelProvider();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : AI_NOT_CONFIGURED_MESSAGE;
+          return new Response(JSON.stringify({ error: message }), {
             status: 400,
             headers: { "Content-Type": "application/json" },
           });
@@ -84,7 +97,7 @@ ${content}`;
 
         try {
           const { text } = await generateText({
-            model: groq(ALEX_MODEL_ID),
+            model: provider(ALEX_MODEL_ID),
             messages: [
               { role: "system", content: sys },
               { role: "user", content: usr },

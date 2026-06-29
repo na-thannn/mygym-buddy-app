@@ -1,6 +1,7 @@
 import { asc, desc, eq } from "drizzle-orm";
 import type { UIMessage } from "ai";
 import { db, schema } from "@/server/db";
+import { sanitizeChatMessages, stripLeakedToolSyntax } from "@/lib/trainer/message-sanitize";
 
 export type ChatThreadSummary = {
   id: string;
@@ -110,12 +111,14 @@ export async function saveChatMessages({
     .limit(1);
   if (!thread || thread.userId !== userId) return false;
 
+  const cleanedMessages = sanitizeChatMessages(messages);
+
   await db.delete(schema.chatMessages).where(eq(schema.chatMessages.threadId, threadId));
-  if (messages.length > 0) {
+  if (cleanedMessages.length > 0) {
     await db
       .insert(schema.chatMessages)
       .values(
-        messages.map((message) => ({
+        cleanedMessages.map((message) => ({
           id: message.id || crypto.randomUUID(),
           threadId,
           role: message.role,
@@ -126,7 +129,7 @@ export async function saveChatMessages({
   }
   const nextTitle =
     !thread.title || thread.title === "New chat"
-      ? titleFromMessages(messages) || thread.title || "New chat"
+      ? titleFromMessages(cleanedMessages) || thread.title || "New chat"
       : thread.title;
   await db
     .update(schema.chatThreads)
@@ -155,7 +158,7 @@ async function loadMessagesForThread(threadId: string): Promise<UIMessage[]> {
     .from(schema.chatMessages)
     .where(eq(schema.chatMessages.threadId, threadId))
     .orderBy(asc(schema.chatMessages.createdAt));
-  return rows
+  const messages = rows
     .map((row) => {
       try {
         return JSON.parse(row.contentJson) as UIMessage;
@@ -167,7 +170,9 @@ async function loadMessagesForThread(threadId: string): Promise<UIMessage[]> {
         };
       }
     })
-    .filter((message) => message.parts.length > 0);
+    .filter((message) => message.parts?.length > 0);
+
+  return sanitizeChatMessages(messages);
 }
 
 function titleFromMessages(messages: UIMessage[]) {
@@ -181,7 +186,11 @@ function titleFromMessages(messages: UIMessage[]) {
 function messagePreview(message: UIMessage) {
   return message.parts
     .map((part) => {
-      if (part.type === "text") return part.text;
+      if (part.type === "text") {
+        return message.role === "assistant"
+          ? stripLeakedToolSyntax(part.text ?? "")
+          : (part.text ?? "");
+      }
       if (part.type?.startsWith("tool-")) return `[${part.type.replace(/^tool-/, "")}]`;
       return "";
     })

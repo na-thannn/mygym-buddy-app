@@ -10,6 +10,15 @@ const DEFAULT_DATABASE_URL = "postgres://hlfitness:hlfitness@localhost:5432/hlfi
 const migrationsFolder = resolve(process.cwd(), "drizzle");
 const isTestRuntime = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 
+type TestDbGlobals = {
+  __hlFitnessTestPool?: pg.Pool;
+  __hlFitnessTestMigrated?: boolean;
+};
+
+function testDbGlobals(): TestDbGlobals {
+  return globalThis as unknown as TestDbGlobals;
+}
+
 function createMemoryPool(): pg.Pool {
   const memoryDb = newDb({ autoCreateForeignKeyIndices: true });
   memoryDb.public.registerFunction({
@@ -94,7 +103,13 @@ function patchPgMemPool<
 }
 
 function createPool(): pg.Pool {
-  if (isTestRuntime) return createMemoryPool();
+  if (isTestRuntime) {
+    const globals = testDbGlobals();
+    if (!globals.__hlFitnessTestPool) {
+      globals.__hlFitnessTestPool = createMemoryPool();
+    }
+    return globals.__hlFitnessTestPool;
+  }
   return new pg.Pool({
     connectionString: process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL,
     max: 10,
@@ -104,51 +119,62 @@ function createPool(): pg.Pool {
 export const pool = createPool();
 export const db = drizzle(pool, { schema });
 
-await migrate(db, { migrationsFolder });
+if (isTestRuntime) {
+  const globals = testDbGlobals();
+  if (!globals.__hlFitnessTestMigrated) {
+    await migrate(db, { migrationsFolder });
+    globals.__hlFitnessTestMigrated = true;
+  }
+} else {
+  await migrate(db, { migrationsFolder });
+}
+
+const TEST_TABLE_CLEAR_ORDER = [
+  "audit_logs",
+  "daily_motivation",
+  "gym_photos",
+  "feed_likes",
+  "feed_comments",
+  "manual_payments",
+  "memberships",
+  "purchase_requests",
+  "public_events",
+  "promotions",
+  "pt_service_offerings",
+  "pt_profiles",
+  "service_offerings",
+  "membership_plans",
+  "branches",
+  "progress_photos",
+  "community_feed",
+  "inbody_reports",
+  "chat_messages",
+  "chat_threads",
+  "analyses",
+  "workout_plan_docs",
+  "group_class_bookings",
+  "group_class_sessions",
+  "group_classes",
+  "support_tickets",
+  "pt_unavailability_blocks",
+  "guest_meetings",
+  "bookings",
+  "progress_reports",
+  "nutrition_reports",
+  "workout_logs",
+  "profiles",
+  "sessions",
+  "users",
+] as const;
 
 export async function resetDatabaseForTests() {
   if (!isTestRuntime) {
     throw new Error("resetDatabaseForTests can only run in Vitest/test mode");
   }
 
-  await db.execute(sql`
-    TRUNCATE TABLE
-      audit_logs,
-      daily_motivation,
-      gym_photos,
-      feed_comments,
-      manual_payments,
-      memberships,
-      purchase_requests,
-      public_events,
-      promotions,
-      pt_service_offerings,
-      pt_profiles,
-      service_offerings,
-      membership_plans,
-      branches,
-      progress_photos,
-      community_feed,
-      inbody_reports,
-      chat_messages,
-      chat_threads,
-      analyses,
-      workout_plan_docs,
-      group_class_bookings,
-      group_class_sessions,
-      group_classes,
-      support_tickets,
-      pt_unavailability_blocks,
-      guest_meetings,
-      bookings,
-      progress_reports,
-      nutrition_reports,
-      workout_logs,
-      profiles,
-      sessions,
-      users
-    RESTART IDENTITY CASCADE
-  `);
+  for (const table of TEST_TABLE_CLEAR_ORDER) {
+    await db.execute(sql.raw(`DELETE FROM ${table}`));
+  }
 }
 
 export { schema };

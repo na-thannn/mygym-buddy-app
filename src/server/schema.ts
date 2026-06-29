@@ -6,6 +6,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const auditTimestamp = (name: string) =>
@@ -42,6 +43,8 @@ export const profiles = pgTable("profiles", {
   heightCm: doublePrecision("height_cm"),
   weightKg: doublePrecision("weight_kg"),
   targetWeightKg: doublePrecision("target_weight_kg"),
+  daysPerWeek: text("days_per_week"),
+  equipment: text("equipment"),
   updatedAt: auditTimestamp("updated_at"),
 });
 
@@ -118,6 +121,8 @@ export const guestMeetings = pgTable("guest_meetings", {
   guestPhone: text("guest_phone").notNull(),
   goal: text("goal").notNull(),
   experience: text("experience").notNull(),
+  daysPerWeek: text("days_per_week"),
+  equipment: text("equipment"),
   requestedPtId: text("requested_pt_id").references(() => users.id, { onDelete: "set null" }),
   assignedPtId: text("assigned_pt_id").references(() => users.id, { onDelete: "set null" }),
   scheduledAt: text("scheduled_at").notNull(),
@@ -259,6 +264,8 @@ export const inbodyReports = pgTable("inbody_reports", {
   weightKg: doublePrecision("weight_kg").notNull(),
   muscleMassKg: doublePrecision("muscle_mass_kg").notNull(),
   bodyFatPercent: doublePrecision("body_fat_percent").notNull(),
+  imageBase64: text("image_base64"),
+  source: text("source").notNull().default("manual"),
   createdAt: auditTimestamp("created_at"),
 });
 
@@ -272,6 +279,21 @@ export const communityFeed = pgTable("community_feed", {
   likesCount: integer("likes_count").notNull().default(0),
   createdAt: auditTimestamp("created_at"),
 });
+
+export const feedLikes = pgTable(
+  "feed_likes",
+  {
+    id: text("id").primaryKey(),
+    postId: text("post_id")
+      .notNull()
+      .references(() => communityFeed.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: auditTimestamp("created_at"),
+  },
+  (table) => [uniqueIndex("feed_likes_post_user_idx").on(table.postId, table.userId)],
+);
 
 export const progressPhotos = pgTable("progress_photos", {
   id: text("id").primaryKey(),

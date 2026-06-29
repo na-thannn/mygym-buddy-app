@@ -183,6 +183,8 @@ export function getNextCustomerEvent({
 export type ProfileSetupDraft = {
   goal?: string | number | null;
   level?: string | number | null;
+  daysPerWeek?: string | number | null;
+  equipment?: string | number | null;
   age?: string | number | null;
   gender?: string | number | null;
   heightCm?: string | number | null;
@@ -217,6 +219,7 @@ export function buildProfileSetupSummary(profile: ProfileSetupDraft): {
       missing: [
         ["goal", profile.goal],
         ["training level", profile.level],
+        ["days per week", profile.daysPerWeek],
       ],
     }),
     buildSetupItem({

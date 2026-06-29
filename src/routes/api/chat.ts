@@ -7,7 +7,12 @@ import {
   type UIMessage,
 } from "ai";
 import { getSessionUser } from "@/server/auth";
-import { getGroq, ALEX_MODEL_ID } from "@/lib/trainer/groq";
+import {
+  AI_NOT_CONFIGURED_MESSAGE,
+  ALEX_MODEL_ID,
+  getModelProvider,
+  isAiConfigured,
+} from "@/lib/trainer/groq";
 import { buildAlexTools } from "@/lib/trainer/tools";
 import { parseRequestBody } from "@/lib/request-utils";
 import { buildTrainerContext, formatYmd } from "@/lib/trainer/context";
@@ -52,11 +57,16 @@ export async function handleChatPost(request: Request) {
     return json({ error: "Invalid chat message" }, 400);
   }
 
-  let groq;
+  if (!isAiConfigured()) {
+    return json({ error: AI_NOT_CONFIGURED_MESSAGE }, 400);
+  }
+
+  let provider;
   try {
-    groq = getGroq();
-  } catch {
-    return json({ error: "Missing GROQ_API_KEY" }, 400);
+    provider = getModelProvider();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : AI_NOT_CONFIGURED_MESSAGE;
+    return json({ error: message }, 400);
   }
 
   const context = await buildTrainerContext({ userId: session.userId });
@@ -66,7 +76,7 @@ export async function handleChatPost(request: Request) {
   });
 
   const result = streamText({
-    model: groq(ALEX_MODEL_ID),
+    model: provider(ALEX_MODEL_ID),
     system,
     messages: await convertToModelMessages(validatedMessages),
     tools: aiTools,

@@ -3,7 +3,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { generateText } from "ai";
 import { getSessionUser } from "@/server/auth";
 import { db, schema } from "@/server/db";
-import { getGroq, FAST_MODEL_ID } from "@/lib/trainer/groq";
+import { FAST_MODEL_ID, getModelProvider, isAiConfigured } from "@/lib/trainer/groq";
 import { buildWeeklyStreak, type WeeklyStreak } from "@/lib/customer-experience";
 import { saigonDateString } from "@/lib/time";
 import logDevError from "@/lib/error-logger";
@@ -73,14 +73,14 @@ export const Route = createFileRoute("/api/today-motivation")({
 
           let message = fallbackMessage(streak);
 
-          if (process.env.GROQ_API_KEY) {
+          if (isAiConfigured()) {
             try {
               const [profile] = await db
                 .select({ goal: schema.profiles.goal, level: schema.profiles.level })
                 .from(schema.profiles)
                 .where(eq(schema.profiles.userId, userId))
                 .limit(1);
-              const groq = getGroq();
+              const provider = getModelProvider();
               const prompt = [
                 "You are Alex, a warm, concise gym coach.",
                 "Write ONE short motivating sentence (max 24 words) for a member's dashboard today.",
@@ -91,7 +91,7 @@ export const Route = createFileRoute("/api/today-motivation")({
                 `Current daily streak: ${streak.currentStreak}`,
               ].join("\n");
               const { text } = await generateText({
-                model: groq(FAST_MODEL_ID),
+                model: provider(FAST_MODEL_ID),
                 prompt,
                 temperature: 0.7,
               });

@@ -15,6 +15,7 @@ import { getSessionUser, hashPassword, newId } from "@/server/auth";
 import { sendGuestMeetingConfirmationEmail, sendTemporaryPasswordEmail } from "@/server/email";
 import { sendZaloEvent } from "@/server/zalo";
 import logDevError from "@/lib/error-logger";
+import { HL_FITNESS_GYM_ACCESS } from "@/lib/trainer/hl-fitness-layout";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -22,6 +23,8 @@ const createSchema = z.object({
   phone: z.string().trim().min(3).max(40),
   goal: z.string().trim().min(1).max(80),
   experience: z.enum(["Beginner", "Intermediate", "Advanced"]),
+  daysPerWeek: z.enum(["2 days", "3 days", "4 days", "5 days", "6+ days"]),
+  equipment: z.literal(HL_FITNESS_GYM_ACCESS).default(HL_FITNESS_GYM_ACCESS),
   requestedPtId: z.string().min(1),
   scheduledAt: z.string().datetime(),
   meetingType: z.enum(["in_person", "online"]).default("in_person"),
@@ -124,6 +127,8 @@ export const Route = createFileRoute("/api/guest-meetings")({
             guestPhone: data.phone,
             goal: data.goal,
             experience: data.experience,
+            daysPerWeek: data.daysPerWeek,
+            equipment: data.equipment,
             requestedPtId: data.requestedPtId,
             assignedPtId: selection.assignedPtId,
             scheduledAt: data.scheduledAt,
@@ -381,6 +386,8 @@ async function sendLoginForGuestMeeting(
       userId,
       goal: meeting.goal,
       level: meeting.experience,
+      daysPerWeek: meeting.daysPerWeek,
+      equipment: meeting.equipment ?? HL_FITNESS_GYM_ACCESS,
     });
   }
 

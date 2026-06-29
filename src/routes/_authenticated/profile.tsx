@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { HL_FITNESS_GYM_ACCESS } from "@/lib/trainer/hl-fitness-layout";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@/lib/authContext";
 import { buildProfileSetupSummary, type ProfileSetupItem } from "@/lib/customer-experience";
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
 type Form = {
   goal: string;
   level: string;
+  daysPerWeek: string;
   limitations: string;
   age: string;
   gender: string;
@@ -45,6 +47,7 @@ type Form = {
 const EMPTY: Form = {
   goal: "",
   level: "",
+  daysPerWeek: "",
   limitations: "",
   age: "",
   gender: "",
@@ -52,6 +55,10 @@ const EMPTY: Form = {
   weightKg: "",
   targetWeightKg: "",
 };
+
+const TRAINING_LEVELS = ["Beginner", "Intermediate", "Advanced"] as const;
+const DAYS_PER_WEEK_OPTIONS = ["2 days", "3 days", "4 days", "5 days", "6+ days"] as const;
+const GENDER_OPTIONS = ["male", "female", "other"] as const;
 
 const SETUP_ICONS = {
   training: Target,
@@ -69,7 +76,7 @@ function ProfilePage() {
 
   const fetchProfile = async () => {
     const res = await fetch("/api/profile", { credentials: "include" });
-    if (!res.ok) return null;
+    if (res.status === 204 || !res.ok) return null;
     return res.json();
   };
 
@@ -92,10 +99,11 @@ function ProfilePage() {
         if (p) {
           setF({
             goal: p.goal ?? "",
-            level: p.level ?? "",
+            level: normalizeTrainingLevel(p.level),
+            daysPerWeek: normalizeDaysPerWeek(p.daysPerWeek),
             limitations: p.limitations ?? "",
             age: p.age?.toString() ?? "",
-            gender: p.gender ?? "",
+            gender: normalizeGender(p.gender),
             heightCm: p.heightCm?.toString() ?? "",
             weightKg: p.weightKg?.toString() ?? "",
             targetWeightKg: p.targetWeightKg?.toString() ?? "",
@@ -120,6 +128,8 @@ function ProfilePage() {
         data: {
           goal: f.goal || null,
           level: f.level || null,
+          daysPerWeek: f.daysPerWeek || null,
+          equipment: HL_FITNESS_GYM_ACCESS,
           limitations: f.limitations || null,
           age: num(f.age),
           gender: f.gender || null,
@@ -155,7 +165,7 @@ function ProfilePage() {
           <Button
             asChild
             variant="outline"
-            className="rounded-xl border-white/10 bg-white/[0.04] text-stone-100 hover:bg-white/[0.08]"
+            className="rounded-xl border-white/15 bg-white/[0.05] text-slate-100 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
           >
             <Link to="/trainer">
               Ask Alex <MessageCircle className="ml-2 size-4" />
@@ -181,7 +191,10 @@ function ProfilePage() {
                 />
               </Field>
               <Field label="Training level">
-                <Select value={f.level} onValueChange={(v) => setF({ ...f, level: v })}>
+                <Select
+                  value={selectValue(f.level, TRAINING_LEVELS)}
+                  onValueChange={(v) => setF({ ...f, level: v })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
@@ -191,6 +204,29 @@ function ProfilePage() {
                     <SelectItem value="Advanced">Advanced</SelectItem>
                   </SelectContent>
                 </Select>
+              </Field>
+              <Field label="Days per week">
+                <Select
+                  value={selectValue(f.daysPerWeek, DAYS_PER_WEEK_OPTIONS)}
+                  onValueChange={(v) => setF({ ...f, daysPerWeek: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="How often can you train?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2 days">2 days</SelectItem>
+                    <SelectItem value="3 days">3 days</SelectItem>
+                    <SelectItem value="4 days">4 days</SelectItem>
+                    <SelectItem value="5 days">5 days</SelectItem>
+                    <SelectItem value="6+ days">6+ days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Gym access" className="sm:col-span-2">
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-stone-300">
+                  {HL_FITNESS_GYM_ACCESS}. Alex plans around the HL Fitness floor layout (Floors
+                  1-4).
+                </div>
               </Field>
             </div>
           </section>
@@ -210,7 +246,10 @@ function ProfilePage() {
                 />
               </Field>
               <Field label="Gender">
-                <Select value={f.gender} onValueChange={(v) => setF({ ...f, gender: v })}>
+                <Select
+                  value={selectValue(f.gender, GENDER_OPTIONS)}
+                  onValueChange={(v) => setF({ ...f, gender: v })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -341,9 +380,17 @@ function SectionHeader({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="space-y-1.5">
+    <div className={`space-y-1.5${className ? ` ${className}` : ""}`}>
       <Label>{label}</Label>
       {children}
     </div>
@@ -376,4 +423,38 @@ function SetupCard({ item }: { item: ProfileSetupItem }) {
       </div>
     </div>
   );
+}
+
+function selectValue<T extends string>(value: string, allowed: readonly T[]): T | undefined {
+  return allowed.includes(value as T) ? (value as T) : undefined;
+}
+
+function normalizeTrainingLevel(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  const match = TRAINING_LEVELS.find((level) => level.toLowerCase() === trimmed.toLowerCase());
+  return match ?? "";
+}
+
+function normalizeGender(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim().toLowerCase();
+  return GENDER_OPTIONS.includes(trimmed as (typeof GENDER_OPTIONS)[number]) ? trimmed : "";
+}
+
+function normalizeDaysPerWeek(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (DAYS_PER_WEEK_OPTIONS.includes(trimmed as (typeof DAYS_PER_WEEK_OPTIONS)[number])) {
+    return trimmed;
+  }
+  const match = trimmed.match(/^(\d+)\+?\s*(?:days?)?$/i);
+  if (!match) return "";
+  const count = Number(match[1]);
+  if (!Number.isFinite(count)) return "";
+  if (count >= 6) return "6+ days";
+  const candidate = `${count} days`;
+  return DAYS_PER_WEEK_OPTIONS.includes(candidate as (typeof DAYS_PER_WEEK_OPTIONS)[number])
+    ? candidate
+    : "";
 }

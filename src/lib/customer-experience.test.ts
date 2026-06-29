@@ -93,6 +93,7 @@ describe("customer experience helpers", () => {
     const summary = buildProfileSetupSummary({
       goal: "Build muscle",
       level: "Intermediate",
+      daysPerWeek: "4 days",
       age: "24",
       gender: "",
       heightCm: "178",

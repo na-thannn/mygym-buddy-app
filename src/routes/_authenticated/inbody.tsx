@@ -22,9 +22,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listInbodyReports } from "@/lib/inbody.functions";
 import { buildInbodyExperience, type InbodyDelta } from "@/lib/customer-experience";
+import { compressImageFile } from "@/lib/image-compress";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/format";
 
@@ -56,6 +57,9 @@ function Inbody() {
     muscleMassKg: "",
     bodyFatPercent: "",
   });
+  const [scanImage, setScanImage] = useState<string | null>(null);
+  const [scanBusy, setScanBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const summary = useMemo(() => buildInbodyExperience(reports), [reports]);
 
@@ -69,7 +73,14 @@ function Inbody() {
   }, []);
 
   const saveReport = async (payload: {
-    data: { reportDate: string; weightKg: number; muscleMassKg: number; bodyFatPercent: number };
+    data: {
+      reportDate: string;
+      weightKg: number;
+      muscleMassKg: number;
+      bodyFatPercent: number;
+      imageBase64?: string | null;
+      source?: string;
+    };
   }) => {
     const res = await fetch("/api/inbody", {
       method: "POST",
@@ -103,7 +114,10 @@ function Inbody() {
   }, [load]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setScanImage(null);
+      return;
+    }
     setForm({
       reportDate: today(),
       weightKg: summary.latest?.weightKg ? String(summary.latest.weightKg) : "",
@@ -111,6 +125,38 @@ function Inbody() {
       bodyFatPercent: summary.latest?.bodyFatPercent ? String(summary.latest.bodyFatPercent) : "",
     });
   }, [open, summary.latest]);
+
+  const handleScanUpload = async (file: File) => {
+    setScanBusy(true);
+    try {
+      const imageBase64 = await compressImageFile(file);
+      setScanImage(imageBase64);
+      const res = await fetch("/api/inbody/scan", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageBase64 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Scan failed");
+      if (data.extracted) {
+        setForm((current) => ({
+          ...current,
+          reportDate: data.extracted.reportDate || current.reportDate,
+          weightKg: String(data.extracted.weightKg ?? current.weightKg),
+          muscleMassKg: String(data.extracted.muscleMassKg ?? current.muscleMassKg),
+          bodyFatPercent: String(data.extracted.bodyFatPercent ?? current.bodyFatPercent),
+        }));
+        toast.success("Scan extracted. Review the numbers before saving.");
+      } else if (data.message) {
+        toast.message(data.message);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not process scan");
+    } finally {
+      setScanBusy(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -132,7 +178,13 @@ function Inbody() {
 
     setBusy(true);
     try {
-      await saveReport({ data: payload });
+      await saveReport({
+        data: {
+          ...payload,
+          imageBase64: scanImage,
+          source: scanImage ? "scan" : "manual",
+        },
+      });
       toast.success("InBody report saved");
       setOpen(false);
       load();
@@ -163,10 +215,43 @@ function Inbody() {
               <DialogHeader>
                 <DialogTitle>Log InBody result</DialogTitle>
                 <DialogDescription className="text-slate-400">
-                  Copy the key numbers from the machine. Alex uses these as progress context.
+                  Enter numbers manually or upload a scanned InBody report for Alex to read.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-5">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleScanUpload(file);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-white/15 bg-white/[0.05] text-slate-100 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                    disabled={scanBusy}
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    {scanBusy ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <Upload className="mr-2 size-4" />
+                    )}
+                    Upload scanned report
+                  </Button>
+                  {scanImage && (
+                    <div className="mt-3 overflow-hidden rounded-xl border border-white/10">
+                      <img src={scanImage} alt="InBody scan preview" className="max-h-48 w-full object-contain" />
+                    </div>
+                  )}
+                </div>
                 <Field label="Report date">
                   <Input
                     type="date"
@@ -327,12 +412,19 @@ function Inbody() {
                     className="rounded-2xl border border-white/10 bg-white/[0.05] p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium text-slate-100">{formatDate(r.reportDate)}</div>
                         <div className="mt-1 text-xs text-slate-400">
                           Weight {r.weightKg}kg | Muscle {r.muscleMassKg}kg | Fat {r.bodyFatPercent}
                           %
                         </div>
+                        {"imageBase64" in r && r.imageBase64 && (
+                          <img
+                            src={r.imageBase64 as string}
+                            alt="InBody scan"
+                            className="mt-2 max-h-24 rounded-lg border border-white/10 object-contain"
+                          />
+                        )}
                       </div>
                       {index === 0 && (
                         <span className="rounded-full bg-primary/15 px-2 py-1 text-[11px] text-primary">

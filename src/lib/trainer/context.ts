@@ -1,9 +1,13 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { buildGymKnowledge } from "./gym-knowledge";
+import {
+  HL_FITNESS_GYM_ACCESS,
+  formatHlFitnessEquipmentLayout,
+} from "./hl-fitness-layout";
 
 const DEFAULT_CONTEXT_DAYS = 21;
-const MAX_CONTEXT_CHARS = 9000;
+const MAX_CONTEXT_CHARS = 12000;
 
 type BuildTrainerContextInput = {
   userId: string;
@@ -96,6 +100,7 @@ export async function buildTrainerContext({
   const sections = [
     `Member context (today ${endDate}, recent window ${startDate} to ${endDate})`,
     formatProfile(profile),
+    formatHlFitnessEquipmentLayout(),
     formatWorkouts(workouts),
     formatNutrition(nutrition),
     formatProgress(progress),
@@ -138,6 +143,8 @@ function formatProfile(profile: typeof schema.profiles.$inferSelect | undefined)
     `- Height: ${profile.heightCm ?? "not saved"} cm`,
     `- Weight: ${profile.weightKg ?? "not saved"} kg`,
     `- Target weight: ${profile.targetWeightKg ?? "not saved"} kg`,
+    `- Days per week: ${profile.daysPerWeek || "not saved"}`,
+    `- Equipment: ${HL_FITNESS_GYM_ACCESS} (HL Fitness branch)`,
   ].join("\n");
 }
 

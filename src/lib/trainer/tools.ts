@@ -5,10 +5,15 @@ import { db, schema } from "@/server/db";
 import { newId } from "@/server/auth";
 import { estimateMacrosForMeals } from "@/lib/nutrition.functions";
 import type { Actor } from "@/lib/roles";
-import { getGroq, ALEX_MODEL_ID } from "./groq";
+import { ALEX_MODEL_ID, getModelProvider } from "./groq";
 import logDevError from "@/lib/error-logger";
 import { generateText } from "ai";
 import { buildGymKnowledge } from "./gym-knowledge";
+import {
+  HL_FITNESS_GYM_ACCESS,
+  formatHlFitnessEquipmentLayout,
+  hlFitnessPlanGenerationRules,
+} from "./hl-fitness-layout";
 import {
   bookGroupClassFromAlex,
   cancelGroupClassBookingFromAlex,
@@ -22,7 +27,7 @@ export function buildAlexTools(actor: Actor) {
   return {
     save_profile: tool({
       description:
-        "Save or update the user's profile: goal, experience level, limitations, age, gender, height, current weight, and target weight. Call this only after collecting the fields the user wants to save or update.",
+        "Save or update the user's profile: goal, experience level, days per week, limitations, age, gender, height, current weight, and target weight. Equipment is always HL Fitness full gym access. Call this only after collecting the fields the user wants to save or update.",
       inputSchema: z.object({
         goal: z.string().optional(),
         level: z.enum(["Beginner", "Intermediate", "Advanced"]).optional(),
@@ -32,20 +37,26 @@ export function buildAlexTools(actor: Actor) {
         heightCm: z.number().min(50).max(280).optional(),
         weightKg: z.number().min(20).max(400).optional(),
         targetWeightKg: z.number().min(20).max(400).optional(),
+        daysPerWeek: z.string().max(40).optional(),
+        equipment: z.string().max(120).optional(),
       }),
       execute: async (input) => {
+        const patchInput = {
+          ...input,
+          equipment: input.equipment?.trim() || HL_FITNESS_GYM_ACCESS,
+        };
         const [existing] = await db
           .select({ userId: schema.profiles.userId })
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, userId))
           .limit(1);
-        const patch = { ...input, updatedAt: new Date().toISOString() };
+        const patch = { ...patchInput, updatedAt: new Date().toISOString() };
         if (existing) {
           await db.update(schema.profiles).set(patch).where(eq(schema.profiles.userId, userId));
         } else {
           await db.insert(schema.profiles).values({ userId, ...patch });
         }
-        return { ok: true, saved: input };
+        return { ok: true, saved: patchInput };
       },
     }),
 
@@ -139,11 +150,13 @@ export function buildAlexTools(actor: Actor) {
 
     generate_workout_plan: tool({
       description:
-        "Generate a personalized workout plan for a given date and save it as Markdown. Use this when the user asks for a workout plan. Before calling, make sure you know days per week, available equipment, goal, level, and relevant limitations; ask one missing question at a time.",
+        "Generate a personalized HL Fitness workout plan for a given date and save it as Markdown. Members always train at HL Fitness with full gym access. Use profile defaults for goal, level, days per week, and limitations. Confirm profile details with the user before calling when they ask for a new plan.",
       inputSchema: z.object({
         planDate: z.string().describe("YYYY-MM-DD"),
-        daysPerWeek: z.string().describe("e.g. '4 days', '6-7 days'"),
-        equipment: z.string().describe("e.g. 'Full gym', 'Dumbbells at home', 'Bodyweight only'"),
+        daysPerWeek: z
+          .string()
+          .optional()
+          .describe("e.g. '4 days', '6-7 days'. Falls back to saved profile."),
         goal: z
           .string()
           .max(500)
@@ -160,18 +173,20 @@ export function buildAlexTools(actor: Actor) {
           .optional()
           .describe("Injuries, movement limits, or constraints supplied in chat"),
       }),
-      execute: async ({ planDate, daysPerWeek, equipment, goal, level, limitations }) => {
+      execute: async ({ planDate, daysPerWeek, goal, level, limitations }) => {
         const [profile] = await db
           .select()
           .from(schema.profiles)
           .where(eq(schema.profiles.userId, userId))
           .limit(1);
-        const groq = getGroq();
-        const sys = `You are Alex, a certified personal trainer. Generate a complete workout plan in Markdown.
+        const resolvedDays = daysPerWeek?.trim() || profile?.daysPerWeek?.trim() || "3 days";
+        const provider = getModelProvider();
+        const sys = `You are Alex, a certified personal trainer at HL Fitness. Generate a complete workout plan in Markdown.
 RULES:
-- Use a Markdown table per training day with columns: Exercise | Sets | Reps | Rest
+${hlFitnessPlanGenerationRules()}
+- Use a Markdown table per training day with columns: Exercise | Floor | Sets | Reps | Rest
 - Include a warm-up section and a cool-down section
-- Tailor to the user's goal, level, limitations, equipment
+- Tailor to the user's goal, level, and limitations
 - Add a short notes/tips section at the end
 Return ONLY the Markdown plan, no preamble.`;
         const usr = `User profile:
@@ -180,27 +195,39 @@ Return ONLY the Markdown plan, no preamble.`;
 - Limitations: ${limitations || profile?.limitations || "none"}
 - Age: ${profile?.age ?? "n/a"}
 - Weight: ${profile?.weightKg ?? "n/a"} kg
-- Days/week: ${daysPerWeek}
-- Equipment: ${equipment}
-- Plan date: ${planDate}`;
+- Days/week: ${resolvedDays}
+- Gym access: ${HL_FITNESS_GYM_ACCESS}
+- Plan date: ${planDate}
+
+${formatHlFitnessEquipmentLayout()}`;
         const { text } = await generateText({
-          model: groq(ALEX_MODEL_ID),
+          model: provider(ALEX_MODEL_ID),
           messages: [
             { role: "system", content: sys },
             { role: "user", content: usr },
           ],
         });
         const id = newId();
+        const title = `Plan for ${planDate} - ${resolvedDays}`;
         await db
           .insert(schema.workoutPlanDocs)
           .values({
             id,
             userId,
             planDate,
-            title: `Plan for ${planDate} - ${daysPerWeek}`,
+            title,
             contentMd: text,
           });
-        return { ok: true, planDate, preview: text.slice(0, 400) };
+        return {
+          ok: true,
+          planId: id,
+          planDate,
+          title,
+          daysPerWeek: resolvedDays,
+          equipment: HL_FITNESS_GYM_ACCESS,
+          contentMd: text,
+          savedToPlans: true,
+        };
       },
     }),
 

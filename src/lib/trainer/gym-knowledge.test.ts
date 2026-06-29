@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useCleanDatabase } from "@/test/use-clean-database";
+
+useCleanDatabase();
 
 beforeEach(() => {
   vi.resetModules();
@@ -321,6 +324,8 @@ describe("Alex gym knowledge", () => {
       now: new Date("2026-06-15T02:00:00.000Z"),
     });
 
+    expect(knowledge.text).toContain("HL Fitness equipment layout");
+    expect(knowledge.text).toContain("Floor 2");
     expect(knowledge.text).toContain("303 Le Thanh Nghi");
     expect(knowledge.text).toContain("0909 000 111");
     expect(knowledge.text).toContain("Standard Monthly");

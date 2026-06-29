@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import logDevError from "@/lib/error-logger";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
+import { generateObject } from "ai";
+import { ALEX_VISION_MODEL_ID, getModelProvider } from "./trainer/groq";
 
 async function requireSession() {
   const { readSessionCookie, validateSessionToken } = await import("@/server/auth");
@@ -17,7 +19,37 @@ const inputSchema = z.object({
   weightKg: z.number().positive(),
   muscleMassKg: z.number().positive(),
   bodyFatPercent: z.number().positive(),
+  imageBase64: z.string().optional().nullable(),
+  source: z.enum(["manual", "scan"]).optional(),
 });
+
+const inbodyVisionSchema = z.object({
+  reportDate: z.string().optional().nullable(),
+  weightKg: z.number(),
+  muscleMassKg: z.number(),
+  bodyFatPercent: z.number(),
+});
+
+export async function estimateInbodyFromImage(input: { imageDataUrl: string }) {
+  const provider = getModelProvider();
+  const { object } = await generateObject({
+    model: provider(ALEX_VISION_MODEL_ID),
+    schema: inbodyVisionSchema,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "You are reading an InBody body composition report from a photo or scan. Return a JSON object with weightKg, muscleMassKg, bodyFatPercent (numbers), and optional reportDate (YYYY-MM-DD if visible).",
+          },
+          { type: "image", image: input.imageDataUrl },
+        ],
+      },
+    ],
+  });
+  return object;
+}
 
 export const saveInbodyReport = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => inputSchema.parse(d))
